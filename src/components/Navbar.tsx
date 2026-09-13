@@ -130,13 +130,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onOpenOwnProfile}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'dev_profile'
+                activeTab === 'dev_profile' || activeTab === 'dev_dashboard'
                   ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <Building2 className="w-4 h-4 text-emerald-600" />
-              <span>Dev Studio</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Developer Dashboard</span>
             </button>
 
             <button
@@ -157,18 +157,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('dev_dashboard')}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'dev_dashboard'
-                  ? 'bg-slate-100 text-slate-900 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-600" />
-              <span>Developer Console</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('community')}
               className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'community'
@@ -178,18 +166,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <MessageSquare className="w-4 h-4 text-indigo-500" />
               <span>Feature Board</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'analytics'
-                  ? 'bg-slate-100 text-slate-900 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4 text-amber-500" />
-              <span>Analytics</span>
             </button>
           </nav>
 
@@ -266,26 +242,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenOwnProfile}
             className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium ${
-              activeTab === 'dev_profile' ? 'bg-emerald-100 text-emerald-900 font-bold' : 'text-slate-600'
+              activeTab === 'dev_profile' || activeTab === 'dev_dashboard' ? 'bg-emerald-100 text-emerald-900 font-bold' : 'text-slate-600'
             }`}
           >
-            Dev Profile
+            Dashboard
           </button>
           <button
             onClick={() => setActiveTab('tester_hub')}
             className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium ${
-              activeTab === 'tester_hub' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600'
+              activeTab === 'tester_hub' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600'
             }`}
           >
             Tester Hub ({myEnrolledApps.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('dev_dashboard')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium ${
-              activeTab === 'dev_dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
-            }`}
-          >
-            Dashboard
           </button>
           <button
             onClick={() => setActiveTab('community')}
@@ -293,15 +261,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'community' ? 'bg-rose-50 text-rose-700' : 'text-slate-600'
             }`}
           >
-            Feedback
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium ${
-              activeTab === 'analytics' ? 'bg-amber-50 text-amber-700' : 'text-slate-600'
-            }`}
-          >
-            Analytics
+            Feature Board
           </button>
         </div>
       </div>

@@ -144,7 +144,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
     setTargetDeveloperId(ownSlug || null);
     setActiveTab('dev_profile');
     if (typeof window !== 'undefined') {
-      const url = ownSlug ? `/profile/${ownSlug}` : '/profile';
+      const url = ownSlug ? `/profile/${ownSlug}/dashboard` : '/profile';
       window.history.pushState({}, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -155,13 +155,13 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
     if (typeof window !== 'undefined') {
       if (tab === 'catalog') {
         window.history.pushState({}, '', '/');
-      } else if (tab === 'dev_profile') {
+      } else if (tab === 'dev_profile' || tab === 'dev_dashboard') {
         const ownSlug = currentUser?.developerAccountName 
           ? slugify(currentUser.developerAccountName) 
           : (currentUser ? slugify(currentUser.name || currentUser.id) : null);
         const target = targetDeveloperId || ownSlug;
         if (target) {
-          window.history.pushState({}, '', `/profile/${target}`);
+          window.history.pushState({}, '', `/profile/${target}/dashboard`);
         } else {
           window.history.pushState({}, '', '/profile');
         }
@@ -236,14 +236,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
           />
         )}
 
-        {activeTab === 'dev_dashboard' && (
-          <DeveloperDashboard
-            onSelectApp={handleOpenAppDetail}
-            onOpenPublish={() => setIsPublishModalOpen(true)}
-          />
-        )}
-
-        {activeTab === 'dev_profile' && (
+        {(activeTab === 'dev_dashboard' || activeTab === 'dev_profile') && (
           <DeveloperProfilePage
             targetDeveloperId={targetDeveloperId || undefined}
             onOpenPublishModal={() => setIsPublishModalOpen(true)}

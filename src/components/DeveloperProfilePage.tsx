@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, AppListing, slugify } from '../types';
+import { User, AppListing, BugReport, BugStatus, slugify } from '../types';
 import { 
   Building2, 
   Globe, 
@@ -22,11 +24,21 @@ import {
   Flame,
   ArrowRight,
   ChevronRight,
+  ChevronDown,
   Share2,
   Check,
-  Copy
+  Copy,
+  Download,
+  Filter,
+  CheckCircle,
+  Eye,
+  AlertTriangle,
+  Clock,
+  ThumbsUp,
+  MessageSquare
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { EditAppModal } from './EditAppModal';
 
 interface DeveloperProfilePageProps {
   onSelectApp: (app: AppListing) => void;
@@ -45,7 +57,11 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     currentUser, 
     allUsers, 
     apps, 
+    bugReports,
+    automatedFeedbacks,
+    enrollments,
     updateDeveloperProfile, 
+    updateBugStatus,
     signInWithSupabaseGoogle, 
     signInWithSupabaseGithub,
     signOutFromSupabase,
@@ -119,28 +135,37 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     ? (profileUser.developerAccountName ? slugify(profileUser.developerAccountName) : slugify(profileUser.name || profileUser.id))
     : '';
 
-  // Synchronize the browser URL to display the unique matching developer URL
+  // Synchronize the browser URL to display the clean matching developer dashboard URL
   useEffect(() => {
     if (typeof window !== 'undefined' && developerSlug) {
       const path = window.location.pathname;
-      if (path === '/profile' || path === '/profile/' || (path.startsWith('/profile/') && path !== `/profile/${developerSlug}`)) {
-        window.history.replaceState({}, '', `/profile/${developerSlug}`);
+      const targetPath = `/profile/${developerSlug}/dashboard`;
+      if (path === '/profile' || path === '/profile/' || (path.startsWith('/profile/') && !path.includes(developerSlug))) {
+        window.history.replaceState({}, '', targetPath);
       }
     }
   }, [developerSlug]);
 
-  // Edit Mode state
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  // Edit Mode state (Inline, no popups)
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  const handleShareProfile = async () => {
+  // App editing modal state
+  const [appToEdit, setAppToEdit] = useState<AppListing | null>(null);
+
+  // Bug triage inline state
+  const [expandedBugId, setExpandedBugId] = useState<string | null>(null);
+  const [bugFilter, setBugFilter] = useState<'all' | 'open' | 'investigating' | 'fix_in_next_build' | 'resolved'>('all');
+  const [developerNoteInput, setDeveloperNoteInput] = useState<{ [bugId: string]: string }>({});
+
+  const handleShareDashboard = async () => {
     if (!profileUser) return;
     const url = typeof window !== 'undefined'
-      ? `${window.location.origin}/profile/${developerSlug || profileUser.id}`
-      : `https://droid88.vercel.app/profile/${developerSlug || profileUser.id}`;
+      ? `${window.location.origin}/profile/${developerSlug || profileUser.id}/dashboard`
+      : `https://droid88.vercel.app/profile/${developerSlug || profileUser.id}/dashboard`;
     try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(url);
@@ -152,7 +177,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     }
   };
 
-  // Form Fields
+  // Form Fields for inline editing
   const [developerAccountName, setDeveloperAccountName] = useState(profileUser ? (profileUser.developerAccountName || `${profileUser.name} Studios`) : '');
   const [company, setCompany] = useState(profileUser?.company || '');
   const [bio, setBio] = useState(profileUser?.bio || 'Android developer managing closed testing tracks and beta tester feedback on Google Play.');
@@ -178,10 +203,33 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
   // Apps published by this developer
   const developerApps = profileUser ? apps.filter(a => 
     a.developerId === profileUser.id || 
-    (profileUser.developerAccountName && a.developerName.toLowerCase() === profileUser.developerAccountName.toLowerCase())
+    (profileUser.developerAccountName && a.developerName.toLowerCase() === profileUser.developerAccountName.toLowerCase()) ||
+    (profileUser.name && a.developerName.toLowerCase() === profileUser.name.toLowerCase())
   ) : [];
 
+  const devAppIds = developerApps.map(a => a.id);
+
+  // Aggregated live calculations
   const totalTestersRecruited = developerApps.reduce((sum, a) => sum + a.currentTesters, 0);
+  const targetTestersTotal = developerApps.reduce((sum, a) => sum + a.targetTesters, 0) || 20;
+  const testersPercent = Math.min(100, Math.round((totalTestersRecruited / targetTestersTotal) * 100));
+  const testersNeeded = Math.max(0, targetTestersTotal - totalTestersRecruited);
+
+  // Real-time QA bugs for developer's apps
+  const devBugs = bugReports.filter(b => devAppIds.includes(b.appId));
+  const filteredBugs = devBugs.filter(b => bugFilter === 'all' || b.status === bugFilter);
+  const openBugsCount = devBugs.filter(b => b.status === 'open' || b.status === 'investigating').length;
+  const criticalBugsCount = devBugs.filter(b => b.severity === 'blocker' && b.status !== 'resolved').length;
+
+  // Real-time Enrolled Testers & Feedback
+  const devEnrollments = enrollments.filter(e => devAppIds.includes(e.appId));
+  const devFeedbacks = automatedFeedbacks.filter(f => devAppIds.includes(f.appId));
+
+  // 14-Day Cycle calculation
+  const primaryApp = developerApps[0];
+  const daysActive = primaryApp && primaryApp.testStartDate
+    ? Math.max(1, Math.min(14, Math.ceil((Date.now() - new Date(primaryApp.testStartDate).getTime()) / (1000 * 60 * 60 * 24))))
+    : 1;
 
   // If targetDeveloperId was specified and developer was not found
   if (!profileUser && targetDeveloperId) {
@@ -219,9 +267,9 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             <Building2 className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h2 className="font-display font-bold text-2xl text-slate-900">Developer Studio</h2>
+            <h2 className="font-display font-bold text-2xl text-slate-900">Developer Dashboard</h2>
             <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-              Sign in or register with GitHub to customize your developer studio, publish closed testing tracks, and recruit 20 verified testers.
+              Sign in or register with GitHub to manage your closed testing tracks, track the 20-tester benchmark, and review QA bug reports.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-xs mx-auto">
@@ -240,9 +288,9 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     );
   }
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
+    setIsSavingProfile(true);
     setSaveSuccess(false);
 
     try {
@@ -261,20 +309,20 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
         verifiedDeveloper: true
       });
 
-      setIsSaving(false);
+      setIsSavingProfile(false);
       setSaveSuccess(true);
-      setIsEditing(false);
+      setIsEditingProfile(false);
 
       confetti({
-        particleCount: 50,
-        spread: 60,
+        particleCount: 45,
+        spread: 55,
         origin: { y: 0.6 }
       });
 
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err) {
       console.error('Error saving developer profile:', err);
-      setIsSaving(false);
+      setIsSavingProfile(false);
     }
   };
 
@@ -293,13 +341,64 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     }
   };
 
+  const handleUpdateBugTriage = (bugId: string, status: BugStatus) => {
+    const note = developerNoteInput[bugId];
+    updateBugStatus(bugId, status, note || undefined);
+  };
+
+  const handleExportSummary = () => {
+    if (!primaryApp) return;
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify({
+        developer: profileUser.developerAccountName || profileUser.name,
+        contactEmail: profileUser.contactEmail || profileUser.email,
+        app: primaryApp.name,
+        package: primaryApp.packageName,
+        version: `v${primaryApp.versionName} (${primaryApp.versionCode})`,
+        trackStatus: primaryApp.status,
+        testersEnrolledCount: primaryApp.currentTesters,
+        targetTestersRequirement: primaryApp.targetTesters,
+        daysActiveElapsed: daysActive,
+        twentyTesterBenchmarkMet: primaryApp.currentTesters >= primaryApp.targetTesters,
+        openBugsCount,
+        criticalBugsCount,
+        enrolledTesters: devEnrollments.map(e => ({
+          name: e.testerName,
+          device: e.deviceModel,
+          os: e.osVersion,
+          checkinsCount: e.dailyCheckins.length
+        }))
+      }, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `${primaryApp.packageName || 'closed_testing'}_google_play_report.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    try {
+      return new Date(dateStr).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       {/* Back button if viewing another developer */}
       {!isOwnProfile && onBackToCatalog && (
         <button
+          type="button"
           onClick={onBackToCatalog}
-          className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition"
+          className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition cursor-pointer"
         >
           <span>← Back to All Closed Testing Tracks</span>
         </button>
@@ -307,22 +406,20 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
 
       {/* Main Developer Identity Profile Header */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Profile Details Header */}
         <div className="p-6 sm:p-8 bg-gradient-to-b from-slate-50/80 via-white to-white border-b border-slate-100">
           {/* Top Status & Verification Badges Row */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-slate-500 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/80 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-slate-400" />
-                <span>droid88.vercel.app/profile/{developerSlug}</span>
+                <span>droid88.vercel.app/profile/{developerSlug}/dashboard</span>
               </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Supabase Cloud Profile Pill */}
               <span className="bg-white border border-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 font-medium shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Supabase Cloud Profile</span>
+                <span>Developer Dashboard</span>
               </span>
 
               {profileUser.verifiedDeveloper && (
@@ -348,11 +445,9 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <h1 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight">
-                    {profileUser.developerAccountName || `${profileUser.name} Studios`}
-                  </h1>
-                </div>
+                <h1 className="font-display font-black text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight">
+                  {profileUser.developerAccountName || `${profileUser.name} Studios`}
+                </h1>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                   <span className="font-semibold text-slate-700">Account Owner: {profileUser.name}</span>
@@ -369,33 +464,36 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             </div>
 
             {/* Profile Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
               <button
-                onClick={handleShareProfile}
-                className="px-4 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-                title="Copy unique profile link"
+                type="button"
+                onClick={handleShareDashboard}
+                className="px-3.5 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                title="Copy dashboard link"
               >
                 {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
-                <span>{isCopied ? 'Link Copied!' : 'Share Profile'}</span>
+                <span>{isCopied ? 'Link Copied!' : 'Share Dashboard'}</span>
               </button>
 
               {isOwnProfile && (
                 <>
                   <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                      isEditing 
+                    type="button"
+                    onClick={() => setIsEditingProfile(!isEditingProfile)}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                      isEditingProfile 
                         ? 'bg-slate-200 text-slate-800 hover:bg-slate-300' 
-                        : 'bg-slate-900 hover:bg-slate-800 text-white'
+                        : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-300'
                     }`}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
-                    <span>{isEditing ? 'Cancel Editing' : 'Edit Developer Details'}</span>
+                    <span>{isEditingProfile ? 'Cancel' : 'Edit Studio Details'}</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={onOpenPublishModal}
-                    className="px-4 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>+ Publish Track</span>
                   </button>
@@ -405,369 +503,336 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
           </div>
         </div>
 
-        {/* Profile Details Container */}
-        <div className="p-6 sm:p-8 space-y-6">
+        {/* Success Alert */}
+        {saveSuccess && (
+          <div className="m-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-xs text-emerald-900 animate-fadeIn">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div>
+              <strong>Studio Details Updated!</strong> Your developer account name and studio information have been synchronized persistently to Supabase.
+            </div>
+          </div>
+        )}
 
-          {/* Success Banner */}
-          {saveSuccess && (
-            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-xs text-emerald-900 animate-fadeIn">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+        {/* INLINE EDIT PROFILE FORM (ZERO POPUPS) */}
+        {isEditingProfile && isOwnProfile && (
+          <form onSubmit={handleSaveProfile} className="m-6 bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-5 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <strong>Developer Profile Updated!</strong> Your developer account name and studio details have been synchronized persistently to Supabase.
+                <h3 className="font-display font-bold text-slate-900 text-sm">
+                  Configure Studio & Android Developer Information
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Update your public studio name, website, and Play Console details inline.
+                </p>
               </div>
+
+              <button
+                type="submit"
+                disabled={isSavingProfile}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSavingProfile ? 'Saving...' : 'Save Changes'}</span>
+              </button>
             </div>
-          )}
 
-          {/* Google Auth Status & Connect Box */}
-          {isOwnProfile && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-2xs">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-900">
-                      {supabaseUser ? `Connected as ${supabaseUser.email}` : 'Google Account Not Connected'}
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      supabaseUser 
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}>
-                      {supabaseUser ? 'Supabase Live' : 'Demo / Guest Profile'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 block mt-0.5">
-                    {supabaseUser 
-                      ? 'Developer credentials and published tracks are linked to this Google Supabase account.'
-                      : 'Sign in with Google to sync your tracks, feedback, and verified badge to Supabase.'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGoogleConnect}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ${
-                    supabaseUser
-                      ? 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-300'
-                      : 'bg-slate-900 hover:bg-slate-800 text-white'
-                  }`}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{supabaseUser ? 'Switch Google Account' : 'Sign in with Google'}</span>
-                </button>
-
-                {supabaseUser && (
-                  <button
-                    onClick={signOutFromSupabase}
-                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
-                    title="Sign Out from Supabase"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {authError && (
-            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{authError}</span>
-            </div>
-          )}
-
-          {/* Edit Profile Form OR View Profile Info */}
-          {isEditing ? (
-            <form onSubmit={handleSave} className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-5 text-xs">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div>
-                  <h3 className="font-display font-bold text-slate-900 text-sm">
-                    Configure Developer Account & Studio Information
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Set your public Android developer account name and studio details.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSaving ? 'Saving to Supabase...' : 'Save Changes'}</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Developer Account Name */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Developer Account Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={developerAccountName}
-                    onChange={(e) => setDeveloperAccountName(e.target.value)}
-                    placeholder="e.g. Nordic Byte Labs or PixelCraft Devs"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                    required
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    This is your public studio / developer brand name displayed across the WooCommerce catalog.
-                  </span>
-                </div>
-
-                {/* Company / Legal Entity */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Organization / Studio Entity
-                  </label>
-                  <input
-                    type="text"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    placeholder="e.g. Nordic Byte Labs LLC"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    Optional studio entity or indie label name.
-                  </span>
-                </div>
-
-                {/* Google Play Console Developer Account ID */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Google Play Console Developer Account ID
-                  </label>
-                  <input
-                    type="text"
-                    value={googlePlayConsoleDevId}
-                    onChange={(e) => setGooglePlayConsoleDevId(e.target.value)}
-                    placeholder="e.g. 882910481029"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    Found in Google Play Console Account Settings.
-                  </span>
-                </div>
-
-                {/* Public Website / Portfolio */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Developer Website / Portfolio URL
-                  </label>
-                  <input
-                    type="url"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="https://nordicbyte.dev"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                </div>
-
-                {/* Public Support / Contact Email */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Public Support / Contact Email
-                  </label>
-                  <input
-                    type="email"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="dev@nordicbyte.dev"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                </div>
-
-                {/* Android Testing Hardware */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-800 block">
-                    Primary Android Dev Device
-                  </label>
-                  <input
-                    type="text"
-                    value={deviceModel}
-                    onChange={(e) => setDeviceModel(e.target.value)}
-                    placeholder="e.g. Google Pixel 8 Pro"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              {/* Bio */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="font-bold text-slate-800 block">
-                  Studio Biography & Testing Mission
+                  Developer Account Name <span className="text-rose-500">*</span>
                 </label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={3}
-                  placeholder="Tell your beta testers about what you are building, architectural choices (Jetpack Compose, Kotlin Multiplatform), and focus areas..."
+                <input
+                  type="text"
+                  value={developerAccountName}
+                  onChange={(e) => setDeveloperAccountName(e.target.value)}
+                  placeholder="e.g. MG Studios"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">
+                  Organization / Studio Entity
+                </label>
+                <input
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="e.g. MG Studios LLC"
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition"
-                >
-                  {isSaving ? 'Saving...' : 'Save & Publish Profile'}
-                </button>
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">
+                  Google Play Console Developer Account ID
+                </label>
+                <input
+                  type="text"
+                  value={googlePlayConsoleDevId}
+                  onChange={(e) => setGooglePlayConsoleDevId(e.target.value)}
+                  placeholder="e.g. 882910481029"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
               </div>
-            </form>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-slate-700 text-xs sm:text-sm leading-relaxed max-w-3xl">
-                {profileUser.bio || 'Android developer managing closed testing tracks and beta tester feedback on Google Play.'}
-              </p>
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 pt-2 border-t border-slate-100">
-                {profileUser.company && (
-                  <span className="flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-slate-400" />
-                    <span>{profileUser.company}</span>
-                  </span>
-                )}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">
+                  Website / Portfolio URL
+                </label>
+                <input
+                  type="url"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://vaiiya.com"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+              </div>
 
-                {profileUser.website && (
-                  <a
-                    href={profileUser.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-emerald-700 hover:underline font-medium"
-                  >
-                    <Globe className="w-4 h-4" />
-                    <span>{profileUser.website.replace(/^https?:\/\//, '')}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">
+                  Public Support / Contact Email
+                </label>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="dev@vaiiya.com"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+              </div>
 
-                {profileUser.contactEmail && (
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <span>{profileUser.contactEmail}</span>
-                  </span>
-                )}
-
-                {profileUser.googlePlayConsoleDevId && (
-                  <span className="flex items-center gap-1.5 font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">
-                    Play Console Dev ID: {profileUser.googlePlayConsoleDevId}
-                  </span>
-                )}
-
-                {profileUser.deviceInfo && (
-                  <span className="flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-slate-400" />
-                    <span>{profileUser.deviceInfo.model} ({profileUser.deviceInfo.osVersion})</span>
-                  </span>
-                )}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">
+                  Primary Android Dev Device
+                </label>
+                <input
+                  type="text"
+                  value={deviceModel}
+                  onChange={(e) => setDeviceModel(e.target.value)}
+                  placeholder="e.g. Google Pixel 8 Pro"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
               </div>
             </div>
-          )}
-        </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-slate-800 block">
+                Studio Biography & Mission
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={2}
+                placeholder="Describe your studio and testing objectives..."
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingProfile}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition cursor-pointer"
+              >
+                {isSavingProfile ? 'Saving...' : 'Save & Update Studio'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Bio and metadata display (when not editing) */}
+        {!isEditingProfile && (
+          <div className="p-6 sm:p-8 space-y-4">
+            <p className="text-slate-700 text-xs sm:text-sm leading-relaxed max-w-3xl">
+              {profileUser.bio || 'Android developer managing closed testing tracks and beta tester feedback on Google Play.'}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 pt-2 border-t border-slate-100">
+              {profileUser.company && (
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                  <span>{profileUser.company}</span>
+                </span>
+              )}
+
+              {profileUser.website && (
+                <a
+                  href={profileUser.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-emerald-700 hover:underline font-medium"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>{profileUser.website.replace(/^https?:\/\//, '')}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+
+              {profileUser.contactEmail && (
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  <span>{profileUser.contactEmail}</span>
+                </span>
+              )}
+
+              {profileUser.googlePlayConsoleDevId && (
+                <span className="flex items-center gap-1.5 font-mono text-[11px] bg-slate-100 px-2.5 py-1 rounded-md text-slate-700 border border-slate-200/60">
+                  Play Console Dev ID: {profileUser.googlePlayConsoleDevId}
+                </span>
+              )}
+
+              {profileUser.deviceInfo && (
+                <span className="flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4 text-slate-400" />
+                  <span>{profileUser.deviceInfo.model} ({profileUser.deviceInfo.osVersion})</span>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Aggregate Developer Track Metrics */}
+      {/* 4 HIGH-IMPACT KPI BENCHMARK CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Published Tracks</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-display text-slate-900">
-              {developerApps.length}
+        {/* Card 1: 20-Tester Play Store Benchmark */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Play Store Benchmark</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              totalTestersRecruited >= 20 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            }`}>
+              {totalTestersRecruited >= 20 ? 'Target Met' : `${testersNeeded} needed`}
             </span>
-            <span className="text-xs text-slate-400">Android apps</span>
           </div>
-          <span className="text-[11px] text-emerald-700 font-medium block">
-            Google Play closed tracks
-          </span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Community Testers</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-display text-indigo-700">
+            <span className="text-2xl sm:text-3xl font-black font-display text-slate-900">
               {totalTestersRecruited}
             </span>
-            <span className="text-xs text-slate-400">total opt-ins</span>
+            <span className="text-xs font-semibold text-slate-400">/ 20 Testers</span>
+          </div>
+          {/* Mini progress bar */}
+          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div 
+              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+              style={{ width: `${testersPercent}%` }}
+            />
           </div>
           <span className="text-[11px] text-slate-500 block">
-            Across active closed tracks
+            {testersPercent}% of Google Play closed test requirement
           </span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">14-Day Progress</span>
+        {/* Card 2: 14-Day Closed Cycle */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">14-Day Cycle Status</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-display text-amber-600">
-              Day 8
+            <span className="text-2xl sm:text-3xl font-black font-display text-amber-600">
+              Day {daysActive}
             </span>
-            <span className="text-xs text-slate-400">of 14</span>
+            <span className="text-xs font-semibold text-slate-400">of 14</span>
           </div>
-          <span className="text-[11px] text-amber-700 font-medium block">
-            Continuous daily check-ins
+          <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-block">
+            Continuous testing streak
+          </span>
+          <span className="text-[11px] text-slate-500 block">
+            {14 - daysActive > 0 ? `${14 - daysActive} days until production review` : 'Ready for production apply'}
           </span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">QA Reputation</span>
+        {/* Card 3: QA Bug Reports */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Reported Bugs</span>
+            {criticalBugsCount > 0 ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                {criticalBugsCount} Critical
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                Crash Free
+              </span>
+            )}
+          </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-display text-emerald-700">
+            <span className="text-2xl sm:text-3xl font-black font-display text-slate-900">
+              {devBugs.length}
+            </span>
+            <span className="text-xs font-semibold text-slate-400">total issues</span>
+          </div>
+          <span className="text-[11px] text-slate-500 block">
+            {openBugsCount} open investigations in progress
+          </span>
+        </div>
+
+        {/* Card 4: QA Community Reputation */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Developer Score</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-display text-emerald-700">
               {profileUser.reputationScore}
             </span>
-            <span className="text-xs text-slate-400">points</span>
+            <span className="text-xs font-semibold text-slate-400">points</span>
           </div>
-          <span className="text-[11px] text-emerald-700 font-medium block">
-            Ranked community member
+          <span className="text-[11px] text-emerald-800 font-medium block">
+            Verified QA community partner
+          </span>
+          <span className="text-[11px] text-slate-500 block">
+            Ranked based on test feedback & builds
           </span>
         </div>
       </div>
 
-      {/* Developer's Closed Testing Tracks */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      {/* SECTION 1: PUBLISHED TESTING TRACKS & OPT-IN LINKS */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
-            <h2 className="font-display font-bold text-slate-900 text-lg sm:text-xl flex items-center gap-2">
+            <h2 className="font-display font-extrabold text-slate-900 text-lg sm:text-xl flex items-center gap-2">
               <Layers className="w-5 h-5 text-emerald-600" />
               <span>
-                {isOwnProfile ? 'My Published Closed Testing Tracks' : `Apps by ${profileUser.developerAccountName || profileUser.name}`} ({developerApps.length})
+                {isOwnProfile ? 'Published Closed Testing Tracks' : `Apps by ${profileUser.developerAccountName || profileUser.name}`} ({developerApps.length})
               </span>
             </h2>
             <p className="text-xs text-slate-500">
-              Open tracks for Google Play closed testing with direct opt-in links and automated feedback milestones.
+              Active closed testing builds recruiting testers with Google Group integration and Play Store opt-in tracks.
             </p>
           </div>
 
-          {isOwnProfile && (
-            <button
-              onClick={onOpenPublishModal}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <span>+ Post New Track</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isOwnProfile && primaryApp && (
+              <button
+                type="button"
+                onClick={handleExportSummary}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
+                title="Export test report for Google Play Console submission"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Play Store Report</span>
+              </button>
+            )}
+
+            {isOwnProfile && (
+              <button
+                type="button"
+                onClick={onOpenPublishModal}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <span>+ Post New Track</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {developerApps.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-3">
+          <div className="p-10 text-center space-y-3">
             <Smartphone className="w-12 h-12 text-slate-300 mx-auto" />
             <h3 className="font-display font-bold text-slate-800 text-base">No closed testing tracks published yet</h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
@@ -775,6 +840,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             </p>
             {isOwnProfile && (
               <button
+                type="button"
                 onClick={onOpenPublishModal}
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
               >
@@ -783,38 +849,38 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {developerApps.map((app) => {
-              const testersPct = Math.min(100, Math.round((app.currentTesters / app.targetTesters) * 100));
+              const appPct = Math.min(100, Math.round((app.currentTesters / app.targetTesters) * 100));
 
               return (
                 <div
                   key={app.id}
-                  className="bg-white rounded-3xl border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-md transition duration-200 flex flex-col justify-between overflow-hidden group"
+                  className="bg-slate-50/80 rounded-2xl border border-slate-200 hover:border-slate-300 p-5 space-y-4 flex flex-col justify-between transition"
                 >
-                  <div className="p-5 space-y-4">
-                    {/* Top Row: Icon, Name, Category */}
-                    <div className="flex items-start gap-3">
+                  <div className="space-y-4">
+                    {/* App Identity Row */}
+                    <div className="flex items-start gap-3.5">
                       <img
                         src={app.icon}
                         alt={app.name}
-                        className="w-14 h-14 rounded-2xl object-cover border border-slate-100 shadow-2xs shrink-0 group-hover:scale-105 transition duration-200"
+                        className="w-14 h-14 rounded-2xl object-cover border border-slate-200 bg-white shadow-sm shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
                             {app.category}
                           </span>
-                          <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
-                            v{app.versionName}
+                          <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            v{app.versionName} ({app.versionCode})
                           </span>
                         </div>
-                        <h3 className="font-display font-bold text-slate-900 text-base leading-snug truncate">
+                        <h3 className="font-display font-bold text-slate-900 text-base sm:text-lg truncate mt-1">
                           {app.name}
                         </h3>
-                        <span className="text-xs font-mono text-slate-400 block truncate">
+                        <p className="text-xs font-mono text-slate-400 truncate">
                           {app.packageName}
-                        </span>
+                        </p>
                       </div>
                     </div>
 
@@ -823,56 +889,74 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                       {app.shortDescription}
                     </p>
 
-                    {/* 20-Tester Closed Benchmark Progress */}
-                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2">
+                    {/* 20-Tester Progress Bar */}
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600 font-semibold flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Tester Recruitment</span>
-                        </span>
+                        <span className="font-semibold text-slate-600">Tester Recruitment</span>
                         <span className="font-bold text-slate-900">
-                          {app.currentTesters} / {app.targetTesters}
+                          {app.currentTesters} / {app.targetTesters} ({appPct}%)
                         </span>
                       </div>
-
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="bg-emerald-600 h-full rounded-full transition-all duration-300"
-                          style={{ width: `${testersPct}%` }}
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${appPct}%` }}
                         />
                       </div>
-
-                      <div className="flex items-center justify-between text-[10px] text-slate-500">
-                        <span>{testersPct}% reached</span>
-                        <span>{app.targetTesters - app.currentTesters > 0 ? `${app.targetTesters - app.currentTesters} more needed` : 'Goal Satisfied'}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                        <span>{app.targetTesters - app.currentTesters > 0 ? `${app.targetTesters - app.currentTesters} more needed` : 'Target Met'}</span>
+                        <span>Added {formatDate(app.createdAt)}</span>
                       </div>
                     </div>
 
-                    {/* Google Play Closed Track Opt-in */}
-                    <a
-                      href={app.testingTrackUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-800 font-semibold truncate hover:underline"
-                    >
-                      <span>Google Play Opt-in Track</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {/* Google Play & Group Opt-in Links */}
+                    <div className="flex flex-col gap-1.5 text-xs">
+                      {app.webOptInUrl && (
+                        <a
+                          href={app.webOptInUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1.5 truncate"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Web Opt-In: {app.webOptInUrl}</span>
+                        </a>
+                      )}
+                      {app.androidOptInUrl && (
+                        <a
+                          href={app.androidOptInUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-indigo-700 hover:text-indigo-800 font-semibold flex items-center gap-1.5 truncate"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Android Store: {app.androidOptInUrl}</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Bottom Action Footer */}
-                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+                  {/* Actions for Track */}
+                  <div className="pt-3 border-t border-slate-200/80 flex items-center gap-2">
+                    {isOwnProfile && (
+                      <button
+                        type="button"
+                        onClick={() => setAppToEdit(app)}
+                        className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit App</span>
+                      </button>
+                    )}
+
                     <button
+                      type="button"
                       onClick={() => onSelectApp(app)}
-                      className="font-bold text-slate-800 hover:text-emerald-700 transition flex items-center gap-1"
+                      className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                     >
                       <span>View App Track</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
-
-                    <span className="text-[11px] text-slate-400">
-                      Added {app.createdAt}
-                    </span>
                   </div>
                 </div>
               );
@@ -880,6 +964,309 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
           </div>
         )}
       </div>
+
+      {/* SECTION 2: GOOGLE PLAY 14-DAY REQUIREMENTS CHECKLIST */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-5">
+        <div>
+          <h2 className="font-display font-extrabold text-slate-900 text-lg sm:text-xl flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-600" />
+            <span>Google Play Production Requirements Checklist</span>
+          </h2>
+          <p className="text-xs text-slate-500">
+            Real-time compliance checklist for Google Play Console 14-day / 20-tester closed track policy.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${totalTestersRecruited >= 20 ? 'text-emerald-600' : 'text-slate-300'}`} />
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">20 Opted-in Testers Requirement</span>
+              <span className="text-xs text-slate-500 block mt-0.5">
+                {totalTestersRecruited} / 20 testers currently enrolled across closed tracks
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${daysActive >= 14 ? 'text-emerald-600' : 'text-amber-500'}`} />
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">14 Consecutive Active Testing Days</span>
+              <span className="text-xs text-slate-500 block mt-0.5">
+                Day {daysActive} of 14 in progress; daily check-in loops active
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${criticalBugsCount === 0 ? 'text-emerald-600' : 'text-rose-500'}`} />
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">Zero Blocker Crashes Reported</span>
+              <span className="text-xs text-slate-500 block mt-0.5">
+                {criticalBugsCount} unresolved blocker crashes reported by testers
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600" />
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">Diverse Android Hardware Coverage</span>
+              <span className="text-xs text-slate-500 block mt-0.5">
+                Google Pixel, Samsung Galaxy, OnePlus, and Xiaomi hardware verified
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: LIVE BUG REPORTS & SCREENSHOT TRIAGE (INLINE ACCORDION - ZERO POPUPS!) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div>
+            <h2 className="font-display font-extrabold text-slate-900 text-lg sm:text-xl flex items-center gap-2">
+              <Bug className="w-5 h-5 text-rose-500" />
+              <span>Bugs & Screenshot Triage ({devBugs.length})</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Review issues, examine attached screenshot evidence, and update triage status directly inline without popups.
+            </p>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(['all', 'open', 'investigating', 'fix_in_next_build', 'resolved'] as const).map((statusKey) => (
+              <button
+                key={statusKey}
+                type="button"
+                onClick={() => setBugFilter(statusKey)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer capitalize ${
+                  bugFilter === statusKey
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {statusKey.replace(/_/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredBugs.length === 0 ? (
+          <div className="p-8 text-center space-y-2 bg-slate-50/60 rounded-2xl border border-slate-200/60">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+            <h3 className="font-display font-bold text-slate-800 text-sm">No bug reports match this filter</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Your closed testing track is currently running without reported defects.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredBugs.map((bug) => {
+              const isExpanded = expandedBugId === bug.id;
+
+              return (
+                <div 
+                  key={bug.id}
+                  className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs transition"
+                >
+                  {/* Summary Bar (Clickable header to expand inline) */}
+                  <div 
+                    onClick={() => setExpandedBugId(isExpanded ? null : bug.id)}
+                    className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        bug.severity === 'blocker' ? 'bg-rose-100 text-rose-600' :
+                        bug.severity === 'major' ? 'bg-amber-100 text-amber-600' :
+                        'bg-blue-100 text-blue-600'
+                      }`}>
+                        <Bug className="w-4 h-4" />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                            bug.severity === 'blocker' ? 'bg-rose-100 text-rose-800' :
+                            bug.severity === 'major' ? 'bg-amber-100 text-amber-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {bug.severity}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {bug.title}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>Reported by {bug.testerName}</span>
+                          <span>•</span>
+                          <span>{bug.deviceModel} ({bug.osVersion})</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold capitalize ${
+                        bug.status === 'resolved' ? 'bg-emerald-100 text-emerald-800' :
+                        bug.status === 'fix_in_next_build' ? 'bg-purple-100 text-purple-800' :
+                        bug.status === 'investigating' ? 'bg-amber-100 text-amber-800' :
+                        'bg-rose-100 text-rose-800'
+                      }`}>
+                        {bug.status.replace(/_/g, ' ')}
+                      </span>
+                      {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    </div>
+                  </div>
+
+                  {/* INLINE EXPANDED DETAIL (NO POPUPS!) */}
+                  {isExpanded && (
+                    <div className="p-5 border-t border-slate-100 bg-slate-50/60 space-y-4 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div>
+                            <span className="font-bold text-slate-700 block mb-1">Issue Description:</span>
+                            <p className="text-slate-600 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
+                              {bug.description}
+                            </p>
+                          </div>
+
+                          {bug.stepsToReproduce && (
+                            <div>
+                              <span className="font-bold text-slate-700 block mb-1">Steps to Reproduce:</span>
+                              <div className="whitespace-pre-line text-slate-600 bg-white p-3 rounded-xl border border-slate-200">
+                                {bug.stepsToReproduce}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                              <span className="text-[10px] text-slate-400 block font-bold">EXPECTED:</span>
+                              <span className="text-slate-700">{bug.expectedResult || 'Expected normal flow'}</span>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                              <span className="text-[10px] text-slate-400 block font-bold">ACTUAL:</span>
+                              <span className="text-rose-700">{bug.actualResult || 'Crash or incorrect behavior'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Screenshot Preview & Status Triage */}
+                        <div className="space-y-3">
+                          {bug.screenshotUrl ? (
+                            <div>
+                              <span className="font-bold text-slate-700 block mb-1">Attached Screenshot Evidence:</span>
+                              <a
+                                href={bug.screenshotUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block rounded-xl overflow-hidden border border-slate-200 group relative max-h-48 bg-slate-900"
+                              >
+                                <img
+                                  src={bug.screenshotUrl}
+                                  alt="Bug screenshot"
+                                  className="w-full h-full object-cover group-hover:opacity-90 transition"
+                                />
+                                <span className="absolute bottom-2 right-2 bg-slate-900/80 text-white text-[10px] px-2 py-1 rounded-md flex items-center gap-1 font-semibold">
+                                  <Eye className="w-3 h-3" />
+                                  <span>View Full Image</span>
+                                </span>
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-white rounded-xl border border-slate-200 text-slate-400 italic">
+                              No screenshot attached to this report.
+                            </div>
+                          )}
+
+                          {/* Direct Inline Triage Status Changer */}
+                          {isOwnProfile && (
+                            <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
+                              <span className="font-bold text-slate-800 block">Triage Actions & Developer Response:</span>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={bug.status}
+                                  onChange={(e) => handleUpdateBugTriage(bug.id, e.target.value as BugStatus)}
+                                  className="flex-1 px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-xl focus:outline-hidden focus:border-emerald-500 cursor-pointer"
+                                >
+                                  <option value="open">Open Issue</option>
+                                  <option value="investigating">Investigating</option>
+                                  <option value="fix_in_next_build">Fix in Next Build</option>
+                                  <option value="resolved">Resolved & Closed</option>
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 4: ENROLLED TESTERS & TELEMETRY */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="border-b border-slate-100 pb-5">
+          <h2 className="font-display font-extrabold text-slate-900 text-lg sm:text-xl flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-600" />
+            <span>Enrolled Community Testers & Telemetry ({devEnrollments.length})</span>
+          </h2>
+          <p className="text-xs text-slate-500">
+            Active opt-in testers providing automated check-ins and performance benchmarks.
+          </p>
+        </div>
+
+        {devEnrollments.length === 0 ? (
+          <div className="p-8 text-center space-y-2 bg-slate-50/60 rounded-2xl border border-slate-200/60">
+            <Users className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="font-display font-bold text-slate-800 text-sm">No community testers enrolled yet</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Share your track link or join the DROID88 universal Google Group to recruit testers automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+            {devEnrollments.map((enr) => (
+              <div 
+                key={enr.id}
+                className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3"
+              >
+                <img
+                  src={enr.testerAvatar}
+                  alt={enr.testerName}
+                  className="w-10 h-10 rounded-xl object-cover bg-white border border-slate-200 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="font-bold text-slate-900 text-xs truncate block">
+                    {enr.testerName}
+                  </span>
+                  <span className="text-[11px] text-slate-500 block truncate">
+                    {enr.deviceModel} ({enr.osVersion})
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] font-semibold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+                      {enr.dailyCheckins.length} check-ins
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Edit App Modal for fixing typos / updating fields */}
+      {appToEdit && (
+        <EditAppModal
+          isOpen={true}
+          onClose={() => setAppToEdit(null)}
+          app={appToEdit}
+        />
+      )}
     </div>
   );
 };

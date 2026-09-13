@@ -27,7 +27,7 @@ import { supabase } from '../lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AppContextType {
-  currentUser: User;
+  currentUser: User | null;
   allUsers: User[];
   apps: AppListing[];
   bugReports: BugReport[];
@@ -37,7 +37,7 @@ interface AppContextType {
   enrollments: TesterEnrollment[];
   supabaseUser: SupabaseUser | null;
   isSupabaseLoading: boolean;
-  setCurrentUser: (user: User) => void;
+  setCurrentUser: (user: User | null) => void;
   switchUser: (userId: string) => void;
   loginWithGoogle: (email: string, name: string, role: UserRole, testerTier: TesterTier, developerAccountName?: string) => void;
   signInWithSupabaseGoogle: () => Promise<void>;
@@ -80,9 +80,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : AVAILABLE_USERS;
   });
 
-  const [currentUser, setCurrentUser] = useState<User>(() => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = getSavedItem('current_user');
-    return saved ? JSON.parse(saved) : INITIAL_CURRENT_USER;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.id !== 'user_current_01') {
+          return parsed;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
   });
 
   const [apps, setApps] = useState<AppListing[]>(() => {
@@ -112,43 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [enrollments, setEnrollments] = useState<TesterEnrollment[]>(() => {
     const saved = getSavedItem('enrollments');
-    if (saved) return JSON.parse(saved);
-    
-    const today = new Date().toISOString().split('T')[0];
-    return [
-      {
-        id: 'enr_01',
-        appId: 'app_01',
-        testerId: INITIAL_CURRENT_USER.id,
-        testerName: INITIAL_CURRENT_USER.name,
-        testerAvatar: INITIAL_CURRENT_USER.avatar,
-        testerEmail: INITIAL_CURRENT_USER.email,
-        testerTier: INITIAL_CURRENT_USER.testerTier,
-        enrolledAt: '2026-09-06T10:00:00Z',
-        deviceModel: 'Google Pixel 8 Pro',
-        osVersion: 'Android 14',
-        daysActive: 8,
-        lastActiveDate: today,
-        dailyCheckins: [today],
-        completedFeedbacks: ['day_1', 'day_3', 'day_7']
-      },
-      {
-        id: 'enr_02',
-        appId: 'app_03',
-        testerId: INITIAL_CURRENT_USER.id,
-        testerName: INITIAL_CURRENT_USER.name,
-        testerAvatar: INITIAL_CURRENT_USER.avatar,
-        testerEmail: INITIAL_CURRENT_USER.email,
-        testerTier: INITIAL_CURRENT_USER.testerTier,
-        enrolledAt: '2026-09-09T15:00:00Z',
-        deviceModel: 'Google Pixel 8 Pro',
-        osVersion: 'Android 14',
-        daysActive: 4,
-        lastActiveDate: today,
-        dailyCheckins: [today],
-        completedFeedbacks: ['day_1']
-      }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Supabase Auth listener & initial profile sync
@@ -252,7 +226,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSupabaseUser(session?.user ?? null);
+      const user = session?.user ?? null;
+      setSupabaseUser(user);
+      if (!user) {
+        setCurrentUser(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+        }
+      } else {
+        await checkUser();
+      }
     });
 
     return () => {
@@ -391,12 +374,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await supabase.auth.signOut();
       setSupabaseUser(null);
+      setCurrentUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      }
     } catch (err) {
       console.error('Supabase sign out error:', err);
+      setCurrentUser(null);
     }
   };
 
   const updateDeveloperProfile = async (profileData: Partial<User>) => {
+    if (!currentUser) return;
     const updated: User = {
       ...currentUser,
       ...profileData
@@ -523,12 +512,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const publishApp = async (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>): Promise<AppListing> => {
+    const authorId = currentUser ? currentUser.id : `dev_${Date.now()}`;
+    const authorName = currentUser ? (currentUser.developerAccountName || currentUser.name) : 'Android Developer';
+    const authorAvatar = currentUser ? currentUser.avatar : 'https://api.dicebear.com/7.x/bottts/svg?seed=dev';
+
     const newApp: AppListing = {
       ...appData,
       id: `app_${Date.now()}`,
-      developerId: currentUser.id,
-      developerName: currentUser.developerAccountName || currentUser.name,
-      developerAvatar: currentUser.avatar,
+      developerId: authorId,
+      developerName: authorName,
+      developerAvatar: authorAvatar,
       currentTesters: 0,
       status: 'active_testing',
       createdAt: new Date().toISOString().split('T')[0],
@@ -635,6 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const unenrollFromApp = async (appId: string) => {
+    if (!currentUser) return;
     setEnrollments(prev => prev.filter(e => !(e.appId === appId && e.testerId === currentUser.id)));
     setApps(prev => prev.map(a => {
       if (a.id === appId && a.currentTesters > 0) {
@@ -654,6 +648,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const performDailyCheckin = async (appId: string): Promise<boolean> => {
+    if (!currentUser) return false;
     const today = new Date().toISOString().split('T')[0];
     let updated = false;
 
@@ -682,12 +677,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const reportBug = async (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>): Promise<BugReport> => {
+    const testerId = currentUser ? currentUser.id : `tester_${Date.now()}`;
+    const testerName = currentUser ? currentUser.name : 'Community Tester';
+    const testerAvatar = currentUser ? currentUser.avatar : 'https://api.dicebear.com/7.x/bottts/svg?seed=tester';
+
     const newBug: BugReport = {
       ...bugData,
       id: `bug_${Date.now()}`,
-      testerId: currentUser.id,
-      testerName: currentUser.name,
-      testerAvatar: currentUser.avatar,
+      testerId,
+      testerName,
+      testerAvatar,
       status: 'open',
       createdAt: new Date().toISOString()
     };
@@ -718,9 +717,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Supabase bug insert warning:', e);
     }
 
-    updateDeveloperProfile({
-      reputationScore: (currentUser.reputationScore || 0) + 30
-    });
+    if (currentUser) {
+      updateDeveloperProfile({
+        reputationScore: (currentUser.reputationScore || 0) + 30
+      });
+    }
 
     return newBug;
   };
@@ -748,28 +749,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitAutomatedFeedback = async (feedback: Omit<AutomatedFeedbackSubmission, 'id' | 'testerId' | 'testerName' | 'testerTier' | 'submittedAt'>): Promise<AutomatedFeedbackSubmission> => {
+    const testerId = currentUser ? currentUser.id : `tester_${Date.now()}`;
+    const testerName = currentUser ? currentUser.name : 'Community Tester';
+    const testerTier = currentUser ? currentUser.testerTier : 'tier_1_standard';
+
     const newSubmission: AutomatedFeedbackSubmission = {
       ...feedback,
       id: `fb_${Date.now()}`,
-      testerId: currentUser.id,
-      testerName: currentUser.name,
-      testerTier: currentUser.testerTier,
+      testerId,
+      testerName,
+      testerTier,
       submittedAt: new Date().toISOString()
     };
 
     setAutomatedFeedbacks(prev => [newSubmission, ...prev]);
 
-    setEnrollments(prev => prev.map(e => {
-      if (e.appId === feedback.appId && e.testerId === currentUser.id) {
-        if (!e.completedFeedbacks.includes(feedback.phase)) {
-          return {
-            ...e,
-            completedFeedbacks: [...e.completedFeedbacks, feedback.phase]
-          };
+    if (currentUser) {
+      setEnrollments(prev => prev.map(e => {
+        if (e.appId === feedback.appId && e.testerId === currentUser.id) {
+          if (!e.completedFeedbacks.includes(feedback.phase)) {
+            return {
+              ...e,
+              completedFeedbacks: [...e.completedFeedbacks, feedback.phase]
+            };
+          }
         }
-      }
-      return e;
-    }));
+        return e;
+      }));
+    }
 
     try {
       await supabase.from('automated_feedbacks').insert({
@@ -794,23 +801,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Supabase feedback insert warning:', e);
     }
 
-    updateDeveloperProfile({
-      reputationScore: (currentUser.reputationScore || 0) + 40
-    });
+    if (currentUser) {
+      updateDeveloperProfile({
+        reputationScore: (currentUser.reputationScore || 0) + 40
+      });
+    }
 
     return newSubmission;
   };
 
   const createFeatureFeedback = async (data: Omit<FeatureFeedbackItem, 'id' | 'authorId' | 'authorName' | 'authorAvatar' | 'authorRole' | 'likes' | 'likedBy' | 'commentsCount' | 'createdAt'>): Promise<FeatureFeedbackItem> => {
+    const authorId = currentUser ? currentUser.id : `guest_${Date.now()}`;
+    const authorName = currentUser ? (currentUser.role === 'developer' && currentUser.developerAccountName ? currentUser.developerAccountName : currentUser.name) : 'Guest User';
+    const authorAvatar = currentUser ? currentUser.avatar : 'https://api.dicebear.com/7.x/bottts/svg?seed=guest';
+    const authorRole = currentUser ? currentUser.role : 'tester';
+
     const newItem: FeatureFeedbackItem = {
       ...data,
       id: `feat_${Date.now()}`,
-      authorId: currentUser.id,
-      authorName: currentUser.role === 'developer' && currentUser.developerAccountName ? currentUser.developerAccountName : currentUser.name,
-      authorAvatar: currentUser.avatar,
-      authorRole: currentUser.role,
+      authorId,
+      authorName,
+      authorAvatar,
+      authorRole,
       likes: 1,
-      likedBy: [currentUser.id],
+      likedBy: currentUser ? [currentUser.id] : [],
       commentsCount: 0,
       createdAt: new Date().toISOString()
     };
@@ -842,6 +856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikeFeatureFeedback = (feedbackId: string) => {
+    if (!currentUser) return;
     setFeatureFeedbacks(prev => prev.map(item => {
       if (item.id === feedbackId) {
         const isLiked = item.likedBy.includes(currentUser.id);
@@ -868,13 +883,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addComment = async (feedbackId: string, content: string): Promise<FeedbackComment> => {
+    const authorId = currentUser ? currentUser.id : `guest_${Date.now()}`;
+    const authorName = currentUser ? (currentUser.role === 'developer' && currentUser.developerAccountName ? currentUser.developerAccountName : currentUser.name) : 'Guest User';
+    const authorAvatar = currentUser ? currentUser.avatar : 'https://api.dicebear.com/7.x/bottts/svg?seed=guest';
+    const authorRole = currentUser ? currentUser.role : 'tester';
+
     const newComment: FeedbackComment = {
       id: `comm_${Date.now()}`,
       feedbackId,
-      authorId: currentUser.id,
-      authorName: currentUser.role === 'developer' && currentUser.developerAccountName ? currentUser.developerAccountName : currentUser.name,
-      authorAvatar: currentUser.avatar,
-      authorRole: currentUser.role,
+      authorId,
+      authorName,
+      authorAvatar,
+      authorRole,
       content,
       createdAt: new Date().toISOString(),
       likes: 0,
@@ -908,6 +928,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikeComment = (commentId: string) => {
+    if (!currentUser) return;
     setComments(prev => prev.map(comm => {
       if (comm.id === commentId) {
         const isLiked = comm.likedBy.includes(currentUser.id);
@@ -925,13 +946,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetToDefaults = () => {
-    setCurrentUser(INITIAL_CURRENT_USER);
+    setCurrentUser(null);
     setAllUsers(AVAILABLE_USERS);
     setApps(INITIAL_APPS);
     setBugReports(INITIAL_BUG_REPORTS);
     setFeatureFeedbacks(INITIAL_FEATURE_FEEDBACK);
     setComments(INITIAL_COMMENTS);
     setAutomatedFeedbacks(INITIAL_AUTOMATED_FEEDBACKS);
+    setEnrollments([]);
     if (typeof window !== 'undefined') {
       localStorage.clear();
     }

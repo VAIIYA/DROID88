@@ -99,7 +99,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [apps, setApps] = useState<AppListing[]>(() => {
     const saved = getSavedItem('apps');
-    return saved ? JSON.parse(saved) : INITIAL_APPS;
+    if (!saved) return INITIAL_APPS;
+    try {
+      const parsed: AppListing[] = JSON.parse(saved);
+      // Ensure any newly added initial apps (e.g. Matchmoji) are present
+      const existingIds = new Set(parsed.map(a => a.id));
+      const missingInitial = INITIAL_APPS.filter(a => !existingIds.has(a.id));
+      return [...missingInitial, ...parsed];
+    } catch {
+      return INITIAL_APPS;
+    }
   });
 
   const [bugReports, setBugReports] = useState<BugReport[]>(() => {

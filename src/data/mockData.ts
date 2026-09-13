@@ -89,6 +89,44 @@ export const AVAILABLE_USERS: User[] = [
 
 export const INITIAL_APPS: AppListing[] = [
   {
+    id: 'app_matchmoji',
+    developerId: 'user_current_01',
+    developerName: 'Meneer Groot',
+    developerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    name: 'Matchmoji: Emoji Memory Match',
+    packageName: 'com.vaiiya.matchmoji',
+    versionName: '1.0.0-rc1',
+    versionCode: 1,
+    icon: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    category: 'Games',
+    shortDescription: 'Fast-paced brain training emoji card matching puzzle game with haptic feedback and multiplayer duels.',
+    fullDescription: 'Matchmoji challenges players with dynamic memory grids, timed combos, and vibrant emoji themes built purely in Kotlin and Jetpack Compose. We are running our 14-day mandatory Google Play closed test with 20 active testers. Join our official Google Group to immediately unlock the closed testing build on Google Play!',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.vaiiya.matchmoji',
+    webOptInUrl: 'https://play.google.com/apps/testing/com.vaiiya.matchmoji',
+    androidOptInUrl: 'https://play.google.com/store/apps/details?id=com.vaiiya.matchmoji',
+    googleGroupUrl: 'https://groups.google.com/g/matchmoji',
+    requiredTier: 'tier_1_standard',
+    targetTesters: 20,
+    currentTesters: 14,
+    testStartDate: '2026-09-10',
+    testDurationDays: 14,
+    status: 'active_testing',
+    testingFocus: [
+      'High-refresh rate 120Hz frame pacing on memory tile flips',
+      'Haptic feedback engine intensity across different hardware',
+      'Local state restoration on activity recreate / configuration change',
+      'Daily streak persistence without cloud sync'
+    ],
+    minAndroidVersion: 'Android 8.0 (API 26)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-09-10T10:00:00Z',
+    averageRating: 5.0,
+    ratingsCount: 12
+  },
+  {
     id: 'app_01',
     developerId: 'user_current_01',
     developerName: 'Meneer Groot',

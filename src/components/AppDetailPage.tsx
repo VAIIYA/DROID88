@@ -104,7 +104,13 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
         spread: 60,
         origin: { y: 0.6 }
       });
-      setTimeout(() => setJustEnrolled(false), 4000);
+
+      // Automatically open the developer's Google Group join page in a new window
+      if (app.googleGroupUrl && typeof window !== 'undefined') {
+        window.open(app.googleGroupUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      setTimeout(() => setJustEnrolled(false), 5000);
     }
   };
 
@@ -251,16 +257,30 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
                   }`}
                 >
                   <Users className="w-4 h-4" />
-                  <span>{hasAccess ? '1-Click Enroll as Tester' : 'Tier Locked'}</span>
+                  <span>{hasAccess ? (app.googleGroupUrl ? '1-Click Enroll & Join Google Group' : '1-Click Enroll as Tester') : 'Tier Locked'}</span>
                 </button>
               )}
             </div>
           </div>
 
           {justEnrolled && (
-            <div className="p-3 bg-emerald-600 text-white text-xs rounded-2xl flex items-center gap-2 animate-bounce">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>You are now enrolled in closed testing! Check in daily for 14 days to help this indie developer get Google Play approval.</span>
+            <div className="p-3.5 bg-emerald-600 text-white text-xs rounded-2xl flex items-center justify-between gap-3 shadow-md animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>Enrolled!</strong> We opened {app.name}&apos;s Google Group in a new tab. Click &ldquo;Join Group&rdquo; there, then tap the Play Store Opt-In link below to install!
+                </span>
+              </div>
+              {app.googleGroupUrl && (
+                <a
+                  href={app.googleGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1 bg-white text-emerald-800 rounded-lg font-bold text-xs shrink-0 hover:bg-emerald-50 transition"
+                >
+                  Re-open Group
+                </a>
+              )}
             </div>
           )}
         </div>

@@ -359,15 +359,18 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Google Group / Email List URL (Optional)
+                  Google Group URL <span className="text-emerald-700 font-bold">(Recommended for 1-Click Tester Access)</span>
                 </label>
                 <input
                   type="url"
                   value={googleGroupUrl}
                   onChange={(e) => setGoogleGroupUrl(e.target.value)}
-                  placeholder="https://groups.google.com/g/my-beta-testers"
+                  placeholder="https://groups.google.com/g/matchmoji"
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Testers will auto-join this Google Group to unlock your Google Play closed testing track without manual email invites!
+                </span>
               </div>
             </div>
 

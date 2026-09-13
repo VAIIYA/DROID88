@@ -49,6 +49,7 @@ interface AppContextType {
   updateUserRole: (role: UserRole) => void;
   updateTesterTier: (tier: TesterTier) => void;
   publishApp: (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>) => Promise<AppListing>;
+  updateAppScreenshots: (appId: string, screenshots: string[]) => Promise<void>;
   enrollInApp: (appId: string, deviceModel: string, osVersion: string) => Promise<boolean>;
   unenrollFromApp: (appId: string) => Promise<void>;
   performDailyCheckin: (appId: string) => Promise<boolean>;
@@ -609,6 +610,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newApp;
   };
 
+  const updateAppScreenshots = async (appId: string, screenshots: string[]): Promise<void> => {
+    setApps(prev => prev.map(a => a.id === appId ? { ...a, screenshots } : a));
+    try {
+      await supabase.from('apps').update({ screenshots }).eq('id', appId);
+    } catch (e) {
+      console.warn('Supabase app screenshots update warning:', e);
+    }
+  };
+
   const enrollInApp = async (appId: string, deviceModel: string, osVersion: string): Promise<boolean> => {
     if (!currentUser) return false;
     const app = apps.find(a => a.id === appId);
@@ -1033,6 +1043,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateUserRole,
       updateTesterTier,
       publishApp,
+      updateAppScreenshots,
       enrollInApp,
       unenrollFromApp,
       performDailyCheckin,

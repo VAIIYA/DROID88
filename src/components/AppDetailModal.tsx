@@ -432,18 +432,18 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
 
               {/* Screenshots Gallery */}
               {app.screenshots.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <h3 className="font-display font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4 text-slate-500" />
+                    <ImageIcon className="w-4 h-4 text-emerald-600" />
                     <span>App Screenshots & UI Preview</span>
                   </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="flex gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar">
                     {app.screenshots.map((shot, idx) => (
-                      <div key={idx} className="rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-100 group">
+                      <div key={idx} className="relative shrink-0 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 w-36 h-64 group flex items-center justify-center shadow-2xs">
                         <img
                           src={shot}
                           alt={`Screenshot ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
                         />
                       </div>
                     ))}

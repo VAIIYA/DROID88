@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Copy,
   Check,
-  Users
+  Users,
+  Plus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -218,6 +219,60 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
     }
   };
 
+  const [screenshots, setScreenshots] = useState<string[]>([]);
+  const [screenshotUrlInput, setScreenshotUrlInput] = useState('');
+  const [showScreenshotUrlInput, setShowScreenshotUrlInput] = useState(false);
+  const [isUploadingScreenshot, setIsUploadingScreenshot] = useState(false);
+  const [screenshotUploadError, setScreenshotUploadError] = useState<string | null>(null);
+
+  const handleAddScreenshotUrl = () => {
+    if (screenshotUrlInput.trim()) {
+      setScreenshots(prev => [...prev, screenshotUrlInput.trim()]);
+      setScreenshotUrlInput('');
+      setShowScreenshotUrlInput(false);
+    }
+  };
+
+  const handleRemoveScreenshot = (index: number) => {
+    setScreenshots(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleScreenshotFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingScreenshot(true);
+    setScreenshotUploadError(null);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const publicUrl = await uploadFileToStorage('bug-screenshots', file);
+        if (publicUrl) {
+          setScreenshots(prev => [...prev, publicUrl]);
+        } else {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            if (ev.target?.result) {
+              setScreenshots(prev => [...prev, ev.target!.result as string]);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      } catch (err: any) {
+        setScreenshotUploadError(err.message || 'Failed to upload screenshot.');
+      }
+    }
+    setIsUploadingScreenshot(false);
+  };
+
+  const handleAddSampleMockups = () => {
+    setScreenshots([
+      'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=80'
+    ]);
+  };
+
   const [focusPoints, setFocusPoints] = useState<string[]>([
     'In-app billing and subscription restore testing',
     'Background sync and push notification reliability'
@@ -260,9 +315,9 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       testStartDate: new Date().toISOString().split('T')[0],
       testingFocus: focusPoints.length > 0 ? focusPoints : ['General app stability and performance'],
       minAndroidVersion,
-      screenshots: [
-        'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80'
+      screenshots: screenshots.length > 0 ? screenshots : [
+        'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=600&auto=format&fit=crop&q=80'
       ]
     });
 
@@ -579,6 +634,131 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Dedicated App Screenshots & Previews Card */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-emerald-600" />
+                <span>App Screenshots & UI Previews</span>
+              </label>
+              <div className="flex items-center gap-2">
+                {isUploadingScreenshot && (
+                  <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Uploading...
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {screenshots.length} / 6 added
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Provide phone mockups or UI screenshots so testers know what your app looks like. Paste image URLs or upload files.
+            </p>
+
+            {/* Screenshots Thumbnails Gallery */}
+            {screenshots.length > 0 ? (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar">
+                {screenshots.map((shot, idx) => (
+                  <div key={idx} className="relative group shrink-0 w-24 h-40 rounded-xl overflow-hidden border-2 border-slate-200 bg-white shadow-xs">
+                    <img
+                      src={shot}
+                      alt={`Screenshot ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveScreenshot(idx)}
+                        className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-md cursor-pointer transition"
+                        title="Remove screenshot"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <span className="absolute bottom-1 right-1 text-[9px] font-bold bg-black/60 text-white px-1.5 py-0.5 rounded">
+                      #{idx + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 bg-white rounded-xl border border-dashed border-slate-300 text-center">
+                <p className="text-xs text-slate-500">No custom screenshots added yet.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">High-quality phone mockups will be used if left empty, or add your own below.</p>
+              </div>
+            )}
+
+            {/* Action Bar: Upload File, Paste URL Toggle, Sample Mockups */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Upload Screenshot</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    onChange={handleScreenshotFileUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowScreenshotUrlInput(!showScreenshotUrlInput)}
+                  className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{showScreenshotUrlInput ? 'Hide URL Input' : 'Paste Image URL'}</span>
+                </button>
+
+                {screenshots.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleAddSampleMockups}
+                    className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Use Sample Phone Mockups</span>
+                  </button>
+                )}
+              </div>
+
+              {/* URL Input Row */}
+              {showScreenshotUrlInput && (
+                <div className="flex items-center gap-2 pt-1 animate-fadeIn">
+                  <input
+                    type="url"
+                    value={screenshotUrlInput}
+                    onChange={(e) => setScreenshotUrlInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddScreenshotUrl(); } }}
+                    placeholder="https://example.com/screenshot.png"
+                    className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddScreenshotUrl}
+                    disabled={!screenshotUrlInput.trim()}
+                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add</span>
+                  </button>
+                </div>
+              )}
+
+              {screenshotUploadError && (
+                <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 pt-1">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{screenshotUploadError}</span>
+                </p>
+              )}
             </div>
           </div>
 

@@ -1,0 +1,6 @@
+{
+  "name": "DROID88 - Android Closed Testing Hub",
+  "description": "WordPress & WooCommerce-style closed testing marketplace and community for Android developers to publish apps, recruit tiered beta testers, track 14-day engagement analytics, and gather automated feedback with screenshot bug reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

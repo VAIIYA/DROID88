@@ -1,0 +1,485 @@
+import { AppListing, BugReport, FeatureFeedbackItem, FeedbackComment, AutomatedFeedbackSubmission, User } from '../types';
+
+export const INITIAL_CURRENT_USER: User = {
+  id: 'user_current_01',
+  name: 'Meneer Groot',
+  developerAccountName: 'Groot Mobile Labs',
+  bio: 'Independent Android studio creating clean Jetpack Compose audio utilities and hardware telemetry monitors.',
+  website: 'https://grootmobile.dev',
+  contactEmail: 'contact@grootmobile.dev',
+  googlePlayConsoleDevId: '882910481029',
+  company: 'Groot Mobile Labs LLC',
+  verifiedDeveloper: true,
+  email: 'meneergroot@proton.me',
+  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  role: 'developer',
+  testerTier: 'tier_2_verified',
+  googleId: 'g_11093488219483',
+  joinedDate: '2026-01-15',
+  enrolledAppIds: ['app_01', 'app_03'],
+  reputationScore: 480,
+  deviceInfo: {
+    model: 'Google Pixel 8 Pro',
+    osVersion: 'Android 14 (API 34)',
+    manufacturer: 'Google'
+  }
+};
+
+export const AVAILABLE_USERS: User[] = [
+  INITIAL_CURRENT_USER,
+  {
+    id: 'user_dev_02',
+    name: 'Elena Rostova',
+    developerAccountName: 'Apex Mobile Studios',
+    bio: 'Android software engineer specializing in Camera2 / CameraX low-latency video pipelines and Material 3 design.',
+    website: 'https://apexlabs.io',
+    contactEmail: 'elena@apexlabs.io',
+    googlePlayConsoleDevId: '661829471920',
+    company: 'Apex Studios',
+    verifiedDeveloper: true,
+    email: 'elena.android@apexlabs.io',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    role: 'developer',
+    testerTier: 'tier_3_core',
+    googleId: 'g_22091488119001',
+    joinedDate: '2025-11-20',
+    enrolledAppIds: ['app_02'],
+    reputationScore: 920,
+    deviceInfo: {
+      model: 'Samsung Galaxy S24 Ultra',
+      osVersion: 'Android 14 (One UI 6.1)',
+      manufacturer: 'Samsung'
+    }
+  },
+  {
+    id: 'user_tester_01',
+    name: 'Marcus Vance',
+    email: 'marcus.vance.qa@gmail.com',
+    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    role: 'tester',
+    testerTier: 'tier_3_core',
+    googleId: 'g_33092288339112',
+    joinedDate: '2025-08-10',
+    enrolledAppIds: ['app_01', 'app_02', 'app_03', 'app_04'],
+    reputationScore: 1250,
+    deviceInfo: {
+      model: 'Google Pixel 7a',
+      osVersion: 'Android 14 (API 34)',
+      manufacturer: 'Google'
+    }
+  },
+  {
+    id: 'user_tester_02',
+    name: 'Aisha Patel',
+    email: 'aisha.p.dev@gmail.com',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    role: 'tester',
+    testerTier: 'tier_1_standard',
+    googleId: 'g_44093388449223',
+    joinedDate: '2026-02-01',
+    enrolledAppIds: ['app_01', 'app_05'],
+    reputationScore: 210,
+    deviceInfo: {
+      model: 'OnePlus 12',
+      osVersion: 'Android 14 (OxygenOS 14)',
+      manufacturer: 'OnePlus'
+    }
+  }
+];
+
+export const INITIAL_APPS: AppListing[] = [
+  {
+    id: 'app_01',
+    developerId: 'user_current_01',
+    developerName: 'Meneer Groot',
+    developerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    name: 'PulseSync: WearOS Companion',
+    packageName: 'com.apexlabs.pulsesync',
+    versionName: '1.2.0-rc3',
+    versionCode: 42,
+    icon: 'https://images.unsplash.com/photo-1510519138161-58474ebf8463?w=200&auto=format&fit=crop&q=80',
+    category: 'Health & Fitness',
+    shortDescription: 'Real-time biometric telemetry syncing with WearOS watches and Health Connect SDK.',
+    fullDescription: 'PulseSync connects low-energy BLE heart rate monitors and WearOS tiles directly with Health Connect. We are currently conducting our 14-day mandatory Google Play closed test with 20 continuous testers. Your daily telemetry and battery logs are crucial to obtaining production approval.',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.apexlabs.pulsesync',
+    googleGroupUrl: 'https://groups.google.com/g/pulsesync-closed-beta',
+    requiredTier: 'tier_1_standard',
+    targetTesters: 20,
+    currentTesters: 17,
+    testStartDate: '2026-09-05',
+    testDurationDays: 14,
+    status: 'active_testing',
+    testingFocus: [
+      'Health Connect permissions grant loop',
+      'WearOS continuous sensor sync over BLE',
+      'Battery drain during background sleep tracking',
+      'Android 14 Foreground Service types'
+    ],
+    minAndroidVersion: 'Android 10 (API 29)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-09-05T08:00:00Z',
+    averageRating: 4.8,
+    ratingsCount: 15
+  },
+  {
+    id: 'app_02',
+    developerId: 'user_dev_02',
+    developerName: 'Elena Rostova',
+    developerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    name: 'FinTrack Pro: Offline Budget',
+    packageName: 'com.nordicdev.fintrack',
+    versionName: '2.0.4-beta',
+    versionCode: 88,
+    icon: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=200&auto=format&fit=crop&q=80',
+    category: 'Finance',
+    shortDescription: 'Local encrypted double-entry ledger with biometric vault and CSV receipts export.',
+    fullDescription: 'FinTrack Pro gives privacy-conscious users bank-grade financial tracking without any cloud dependency. Data is protected with Android KeyStore AES-GCM-256. Closed beta is on Day 11 of 14, validating export schemas and in-app currency converters.',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.nordicdev.fintrack',
+    googleGroupUrl: 'https://groups.google.com/g/fintrack-internal-testers',
+    requiredTier: 'tier_2_verified',
+    targetTesters: 20,
+    currentTesters: 22,
+    testStartDate: '2026-09-02',
+    testDurationDays: 14,
+    status: 'target_met',
+    testingFocus: [
+      'Biometric prompt fallback on older Samsungs',
+      'Local SQLite SQLCipher migration from v1',
+      'CSV / PDF monthly statement generation'
+    ],
+    minAndroidVersion: 'Android 11 (API 30)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-09-02T10:30:00Z',
+    averageRating: 4.6,
+    ratingsCount: 19
+  },
+  {
+    id: 'app_03',
+    developerId: 'user_current_01',
+    developerName: 'Meneer Groot',
+    developerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    name: 'DevSnap: Logcat & Network Inspector',
+    packageName: 'com.androtools.devsnap',
+    versionName: '0.9.1-alpha',
+    versionCode: 15,
+    icon: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=200&auto=format&fit=crop&q=80',
+    category: 'Tools & Utilities',
+    shortDescription: 'Floating overlay widget for mobile QA to inspect OkHttp logs, ANR traces, and SharedPreferences.',
+    fullDescription: 'DevSnap attaches an on-device debug hud allowing mobile testers to reproduce bugs with exact network call payloads, crash stack traces, and device memory graphs. Requires Shizuku or ADB wireless pairing for elevated system logcat streaming.',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.androtools.devsnap',
+    googleGroupUrl: 'https://groups.google.com/g/devsnap-beta-track',
+    requiredTier: 'tier_2_verified',
+    targetTesters: 20,
+    currentTesters: 12,
+    testStartDate: '2026-09-09',
+    testDurationDays: 14,
+    status: 'active_testing',
+    testingFocus: [
+      'Floating overlay window permissions on MIUI/HyperOS',
+      'OkHttp interceptor payload masking',
+      'Crash capture without freezing target app process'
+    ],
+    minAndroidVersion: 'Android 12 (API 31)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-09-09T14:15:00Z',
+    averageRating: 4.9,
+    ratingsCount: 8
+  },
+  {
+    id: 'app_04',
+    developerId: 'user_dev_02',
+    developerName: 'Elena Rostova',
+    developerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    name: 'NomadRover: Vector Maps & Trails',
+    packageName: 'com.geosphere.nomadrover',
+    versionName: '3.1.0-rc1',
+    versionCode: 104,
+    icon: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=200&auto=format&fit=crop&q=80',
+    category: 'Lifestyle',
+    shortDescription: '100% offline contour maps with GPX waypoint recording for backcountry alpine expeditions.',
+    fullDescription: 'NomadRover brings high-resolution MapLibre vector tile rendering to off-grid mountaineering. We need Core QA testers with varied GPS chipsets (Qualcomm, MediaTek, Exynos) to stress test GNSS lock retention in deep valleys and flight mode.',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.geosphere.nomadrover',
+    googleGroupUrl: 'https://groups.google.com/g/nomadrover-internal-testers',
+    requiredTier: 'tier_3_core',
+    targetTesters: 25,
+    currentTesters: 19,
+    testStartDate: '2026-09-06',
+    testDurationDays: 14,
+    status: 'active_testing',
+    testingFocus: [
+      'GNSS Raw Measurements and Multi-band L1/L5 tracking',
+      'Vector tile cache garbage collection (>2GB downloads)',
+      'Display timeout override during navigation'
+    ],
+    minAndroidVersion: 'Android 10 (API 29)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-09-06T16:00:00Z',
+    averageRating: 4.7,
+    ratingsCount: 14
+  },
+  {
+    id: 'app_05',
+    developerId: 'user_dev_02',
+    developerName: 'Elena Rostova',
+    developerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    name: 'ZenForge: Focus & Digital Detox',
+    packageName: 'com.zenlogic.focusforge',
+    versionName: '1.0.0-gold',
+    versionCode: 10,
+    icon: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=200&auto=format&fit=crop&q=80',
+    category: 'Productivity',
+    shortDescription: 'Deep work timer with strict Android Accessibility app shielding and ambient binaural soundscapes.',
+    fullDescription: 'ZenForge blocks social distractions using the Android Accessibility Service and UsageStatsManager API. Successfully surpassed 20 testers for 14 continuous days! Ready for Play Store Production Review submission.',
+    testingTrackUrl: 'https://play.google.com/apps/testing/com.zenlogic.focusforge',
+    googleGroupUrl: 'https://groups.google.com/g/zenforge-qa',
+    requiredTier: 'tier_1_standard',
+    targetTesters: 20,
+    currentTesters: 24,
+    testStartDate: '2026-08-28',
+    testDurationDays: 14,
+    status: 'completed',
+    testingFocus: [
+      'Accessibility service crash recovery',
+      'Doze mode exemption validation',
+      'Audio focus ducking during phone calls'
+    ],
+    minAndroidVersion: 'Android 9 (API 28)+',
+    screenshots: [
+      'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=600&auto=format&fit=crop&q=80'
+    ],
+    createdAt: '2026-08-28T09:00:00Z',
+    averageRating: 4.9,
+    ratingsCount: 22
+  }
+];
+
+export const INITIAL_BUG_REPORTS: BugReport[] = [
+  {
+    id: 'bug_01',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    testerId: 'user_tester_01',
+    testerName: 'Marcus Vance',
+    testerAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    title: 'WearOS BLE Disconnect when app switches to background on Android 14',
+    description: 'When switching away from PulseSync to another app, the WearOS heartbeat telemetry drops after approximately 45 seconds. The foreground service notification remains, but packet reception freezes.',
+    stepsToReproduce: '1. Launch PulseSync and pair Galaxy Watch 6\n2. Start workout recording\n3. Press Home button to background app\n4. Wait 45 seconds; check watch icon',
+    expectedResult: 'Heartbeat stream should remain continuous via the connectedDevice foreground service.',
+    actualResult: 'Data stream ceases. Resume app shows "Reconnecting to BLE peripheral..."',
+    severity: 'major',
+    status: 'investigating',
+    deviceModel: 'Google Pixel 7a',
+    osVersion: 'Android 14 (Build UP1A.231105.003)',
+    appVersion: '1.2.0-rc3 (42)',
+    screenshotUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80',
+    createdAt: '2026-09-11T11:20:00Z',
+    developerNotes: 'Investigating ForegroundServiceType.CONNECTED_DEVICE permission declaration in Manifest.'
+  },
+  {
+    id: 'bug_02',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    testerId: 'user_tester_02',
+    testerName: 'Aisha Patel',
+    testerAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    title: 'Health Connect permission dialogue cancelled causes infinite loading spinner',
+    description: 'If the user taps the back button or outside the Health Connect permission sheet instead of allowing/denying, the app remains stuck on a semi-transparent scrim with a spinner.',
+    stepsToReproduce: '1. Tap "Connect Health Connect"\n2. Dismiss bottom sheet with swipe down\n3. Return to screen',
+    expectedResult: 'App should handle ActivityResult.CANCELED and return to setup state.',
+    actualResult: 'Infinite indeterminate ProgressBar blocks all touch events.',
+    severity: 'minor',
+    status: 'fix_in_next_build',
+    deviceModel: 'OnePlus 12',
+    osVersion: 'Android 14 (OxygenOS 14)',
+    appVersion: '1.2.0-rc3 (42)',
+    screenshotUrl: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&auto=format&fit=crop&q=80',
+    createdAt: '2026-09-10T14:45:00Z',
+    developerNotes: 'Added timeout handler on permission launcher callback.'
+  },
+  {
+    id: 'bug_03',
+    appId: 'app_03',
+    appName: 'DevSnap: Logcat & Network Inspector',
+    testerId: 'user_tester_01',
+    testerName: 'Marcus Vance',
+    testerAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    title: 'Crash when copying large JSON response (>5MB) to clipboard',
+    description: 'When tapping "Copy cURL / Response Payload" for a GraphQL query returning large image base64 arrays, app encounters TransactionTooLargeException.',
+    stepsToReproduce: '1. Trigger 6MB mock endpoint\n2. Open network card in DevSnap overlay\n3. Tap "Copy Raw Body"',
+    expectedResult: 'Payload written safely to cache file or clipped via ClipData.',
+    actualResult: 'Fatal crash: android.os.TransactionTooLargeException in Binder proxy.',
+    severity: 'blocker',
+    status: 'open',
+    deviceModel: 'Samsung Galaxy S24 Ultra',
+    osVersion: 'Android 14',
+    appVersion: '0.9.1-alpha (15)',
+    screenshotUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
+    createdAt: '2026-09-12T09:10:00Z'
+  }
+];
+
+export const INITIAL_FEATURE_FEEDBACK: FeatureFeedbackItem[] = [
+  {
+    id: 'feat_01',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    authorId: 'user_tester_01',
+    authorName: 'Marcus Vance',
+    authorAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'tester',
+    title: 'Add support for Garmin HRM-Dual ANT+/BLE heart rate straps',
+    description: 'A lot of athletes in our closed testing group use dedicated chest straps alongside smartwatches. Adding standard Bluetooth GATT Heart Rate Service (0x180D) discovery would make this app unbeatable.',
+    category: 'feature_request',
+    status: 'planned',
+    likes: 14,
+    likedBy: ['user_current_01', 'user_dev_02', 'user_tester_02'],
+    commentsCount: 3,
+    createdAt: '2026-09-07T14:30:00Z',
+    tags: ['BLE', 'Hardware', 'Sensors']
+  },
+  {
+    id: 'feat_02',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    authorId: 'user_tester_02',
+    authorName: 'Aisha Patel',
+    authorAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'tester',
+    title: 'AMOLED Pure Black Theme for battery conservation during night logging',
+    description: 'The current dark mode uses slate-800 (#1e293b). For testers doing overnight sleep tracking on OLED screens, true black #000000 drops display power consumption by ~35%.',
+    category: 'improvement',
+    status: 'in_progress',
+    likes: 19,
+    likedBy: ['user_current_01', 'user_tester_01'],
+    commentsCount: 2,
+    createdAt: '2026-09-08T09:15:00Z',
+    tags: ['UI/UX', 'Battery', 'Amoled']
+  },
+  {
+    id: 'feat_03',
+    appId: 'app_03',
+    appName: 'DevSnap: Logcat & Network Inspector',
+    authorId: 'user_tester_01',
+    authorName: 'Marcus Vance',
+    authorAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'tester',
+    title: 'Search regex filter in live floating Logcat stream',
+    description: 'When filtering through thousands of debug tags, having quick regex buttons (e.g. `^HTTP|OkHttp` or `E/.*Exception`) right on the mobile overlay would save us going back to Android Studio.',
+    category: 'feature_request',
+    status: 'under_review',
+    likes: 11,
+    likedBy: ['user_current_01'],
+    commentsCount: 1,
+    createdAt: '2026-09-10T16:00:00Z',
+    tags: ['Logcat', 'DevTools', 'Productivity']
+  }
+];
+
+export const INITIAL_COMMENTS: FeedbackComment[] = [
+  {
+    id: 'comm_01',
+    feedbackId: 'feat_01',
+    authorId: 'user_current_01',
+    authorName: 'Meneer Groot',
+    authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'developer',
+    content: 'Great suggestion Marcus! The standard 0x180D service is already partially drafted in our BLE scanner branch. We will roll this into closed test build 1.3.0-rc1.',
+    createdAt: '2026-09-07T16:45:00Z',
+    likes: 5,
+    likedBy: ['user_tester_01', 'user_tester_02']
+  },
+  {
+    id: 'comm_02',
+    feedbackId: 'feat_01',
+    authorId: 'user_tester_01',
+    authorName: 'Marcus Vance',
+    authorAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'tester',
+    content: 'Awesome! Happy to test with both my Polar H10 and Garmin HRM-Dual as soon as the APK is deployed to the closed testing track.',
+    createdAt: '2026-09-08T08:12:00Z',
+    likes: 2,
+    likedBy: ['user_current_01']
+  },
+  {
+    id: 'comm_03',
+    feedbackId: 'feat_02',
+    authorId: 'user_current_01',
+    authorName: 'Meneer Groot',
+    authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    authorRole: 'developer',
+    content: 'Pure black toggle added to Settings > Display. It will be live in today’s Play Store track update!',
+    createdAt: '2026-09-08T18:20:00Z',
+    likes: 4,
+    likedBy: ['user_tester_02']
+  }
+];
+
+export const INITIAL_AUTOMATED_FEEDBACKS: AutomatedFeedbackSubmission[] = [
+  {
+    id: 'afb_01',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    testerId: 'user_tester_01',
+    testerName: 'Marcus Vance',
+    testerTier: 'tier_3_core',
+    phase: 'day_7',
+    submittedAt: '2026-09-12T10:00:00Z',
+    stabilityRating: 4,
+    batteryImpactRating: 2,
+    uiIntuitivenessRating: 5,
+    crashEncountered: false,
+    favoriteFeatures: 'Instant watch heart rate tile reflection and seamless export to CSV.',
+    confusingAreas: 'Initial Bluetooth pairing took two attempts before peripheral was detected.',
+    netPromoterScore: 9,
+    deviceModel: 'Google Pixel 7a'
+  },
+  {
+    id: 'afb_02',
+    appId: 'app_01',
+    appName: 'PulseSync: WearOS Companion',
+    testerId: 'user_tester_02',
+    testerName: 'Aisha Patel',
+    testerTier: 'tier_1_standard',
+    phase: 'day_3',
+    submittedAt: '2026-09-08T14:20:00Z',
+    stabilityRating: 5,
+    batteryImpactRating: 3,
+    uiIntuitivenessRating: 4,
+    crashEncountered: false,
+    favoriteFeatures: 'The real-time graph visualization is super smooth (120Hz).',
+    confusingAreas: 'Finding where Health Connect storage permissions are toggled.',
+    netPromoterScore: 9,
+    deviceModel: 'OnePlus 12'
+  },
+  {
+    id: 'afb_03',
+    appId: 'app_02',
+    appName: 'FinTrack Pro: Offline Budget',
+    testerId: 'user_tester_01',
+    testerName: 'Marcus Vance',
+    testerTier: 'tier_3_core',
+    phase: 'day_14',
+    submittedAt: '2026-09-11T16:40:00Z',
+    stabilityRating: 5,
+    batteryImpactRating: 1,
+    uiIntuitivenessRating: 5,
+    crashEncountered: false,
+    favoriteFeatures: 'Speed of local SQLite queries and biometric unlock.',
+    confusingAreas: 'None, ready for production rollout on Google Play!',
+    netPromoterScore: 10,
+    deviceModel: 'Samsung Galaxy S24 Ultra'
+  }
+];

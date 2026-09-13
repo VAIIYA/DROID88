@@ -18,7 +18,8 @@ import {
   Copy,
   Check,
   Users,
-  Plus
+  Plus,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -292,11 +293,24 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
     setFocusPoints(focusPoints.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [publishedSuccessApp, setPublishedSuccessApp] = useState<{
+    name: string;
+    packageName: string;
+    versionName: string;
+    webOptInUrl: string;
+    androidOptInUrl: string;
+    googleGroupUrl: string;
+  } | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !packageName || !testingTrackUrl) return;
 
-    publishApp({
+    const webUrl = webOptInUrl.trim() || `https://play.google.com/apps/testing/${packageName.trim().toLowerCase()}`;
+    const androidUrl = androidOptInUrl.trim() || `https://play.google.com/store/apps/details?id=${packageName.trim().toLowerCase()}`;
+    const grpUrl = googleGroupUrl ? googleGroupUrl.trim() : 'https://groups.google.com/g/droid88';
+
+    await publishApp({
       name,
       packageName: packageName.trim().toLowerCase(),
       versionName,
@@ -306,9 +320,9 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       shortDescription: shortDescription.trim() || `${name} closed testing build for Android.`,
       fullDescription: fullDescription.trim() || `Testing goals: 20 testers for 14 continuous days. Focus on stability and usability.`,
       testingTrackUrl: testingTrackUrl.trim(),
-      webOptInUrl: webOptInUrl.trim() || `https://play.google.com/apps/testing/${packageName.trim().toLowerCase()}`,
-      androidOptInUrl: androidOptInUrl.trim() || `https://play.google.com/store/apps/details?id=${packageName.trim().toLowerCase()}`,
-      googleGroupUrl: googleGroupUrl ? googleGroupUrl.trim() : undefined,
+      webOptInUrl: webUrl,
+      androidOptInUrl: androidUrl,
+      googleGroupUrl: grpUrl,
       requiredTier,
       targetTesters: Number(targetTesters) || 20,
       testDurationDays: Number(testDurationDays) || 14,
@@ -327,8 +341,32 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       origin: { y: 0.6 }
     });
 
+    setPublishedSuccessApp({
+      name,
+      packageName: packageName.trim().toLowerCase(),
+      versionName,
+      webOptInUrl: webUrl,
+      androidOptInUrl: androidUrl,
+      googleGroupUrl: grpUrl
+    });
+
     onSuccess();
-    onClose();
+  };
+
+  const handlePostAnnouncementToGoogleGroup = () => {
+    if (!publishedSuccessApp) return;
+    const subject = encodeURIComponent(`[NEW TRACK] ${publishedSuccessApp.name} (v${publishedSuccessApp.versionName}) is open for testing`);
+    const body = encodeURIComponent(
+      `Hello DROID88 Community!\n\n` +
+      `We have just published a new closed testing track for "${publishedSuccessApp.name}" on DROID88.\n\n` +
+      `📦 Package: ${publishedSuccessApp.packageName}\n` +
+      `🎯 Target: 20 testers for 14 continuous days\n\n` +
+      `👉 Join on Web (Google Play): ${publishedSuccessApp.webOptInUrl}\n` +
+      `👉 Join on Android (Google Play): ${publishedSuccessApp.androidOptInUrl}\n\n` +
+      `Please install the app and leave your feedback on our DROID88 Community Board!\n\n` +
+      `Thank you,\n${publishedSuccessApp.name} Developer Team`
+    );
+    window.open(`mailto:droid88@googlegroups.com?subject=${subject}&body=${body}`, '_blank');
   };
 
   return (
@@ -344,8 +382,12 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
               <Smartphone className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-display font-bold text-lg text-white">Publish Android App for Closed Testing</h3>
-              <p className="text-xs text-slate-300">Recruit 20 testers for 14 continuous days to satisfy Google Play requirements</p>
+              <h3 className="font-display font-bold text-lg text-white">
+                {publishedSuccessApp ? 'Track Published Successfully!' : 'Publish Android App for Closed Testing'}
+              </h3>
+              <p className="text-xs text-slate-300">
+                {publishedSuccessApp ? 'Your track is live and added to DROID88 Community' : 'Recruit 20 testers for 14 continuous days to satisfy Google Play requirements'}
+              </p>
             </div>
           </div>
           <button
@@ -356,8 +398,71 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
+        {publishedSuccessApp ? (
+          <div className="p-8 space-y-6 text-center overflow-y-auto">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+              <Check className="w-8 h-8 stroke-[3]" />
+            </div>
+
+            <div>
+              <h4 className="font-display font-bold text-xl text-slate-900">
+                {publishedSuccessApp.name} is Ready for Testers!
+              </h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1.5 leading-relaxed">
+                A community discussion thread has been automatically created on the DROID88 Board.
+                Now notify testers directly on our Google Group!
+              </p>
+            </div>
+
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-emerald-700" />
+                  Post to Google Group ({publishedSuccessApp.googleGroupUrl.replace('https://', '')})
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                  Auto-Draft
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 leading-relaxed">
+                Posting a new conversation in <strong>droid88@googlegroups.com</strong> notifies all members so they can immediately install your app on their Android device.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handlePostAnnouncementToGoogleGroup}
+                  className="w-full sm:w-auto flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Post Topic to Google Group</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+                <a
+                  href={publishedSuccessApp.googleGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full sm:w-auto px-4 py-3 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Open Web Group</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Go to App Catalog
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Form Body */
+          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
           {/* Track URL & Package Name Input Card */}
           <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 space-y-3">
             <div className="flex items-center justify-between">
@@ -916,6 +1021,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

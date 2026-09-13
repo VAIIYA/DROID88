@@ -643,6 +643,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Supabase app insert warning:', e);
     }
 
+    // Automatically spawn a discussion topic for this newly published testing track
+    try {
+      const topicItem: FeatureFeedbackItem = {
+        id: `feat_track_${newApp.id}`,
+        appId: newApp.id,
+        appName: newApp.name,
+        authorId: authorId,
+        authorName: authorName,
+        authorAvatar: authorAvatar,
+        authorRole: 'developer',
+        title: `[Closed Testing] ${newApp.name} v${newApp.versionName} is live for 14-day testing`,
+        description: `🚀 ${newApp.name} is now open for closed testing!\n\nTesting Goal: Recruiting ${newApp.targetTesters} testers for ${newApp.testDurationDays} continuous days to pass Google Play production requirements.\n\nTesting Focus:\n${(newApp.testingFocus || []).map(f => `• ${f}`).join('\n')}\n\nJoin the official Google Group at ${newApp.googleGroupUrl || 'https://groups.google.com/g/droid88'} to automatically gain access on Google Play. Leave feedback or report issues right here!`,
+        category: 'general_feedback',
+        status: 'in_progress',
+        likes: 1,
+        likedBy: [authorId],
+        commentsCount: 0,
+        createdAt: new Date().toISOString(),
+        tags: ['ClosedTesting', 'GooglePlay', newApp.category.replace(/\s+/g, '')]
+      };
+
+      setFeatureFeedbacks(prev => [topicItem, ...prev]);
+
+      await supabase.from('feature_feedbacks').insert({
+        id: topicItem.id,
+        app_id: topicItem.appId,
+        app_name: topicItem.appName,
+        author_id: topicItem.authorId,
+        author_name: topicItem.authorName,
+        author_avatar: topicItem.authorAvatar,
+        author_role: topicItem.authorRole,
+        title: topicItem.title,
+        description: topicItem.description,
+        category: topicItem.category,
+        status: topicItem.status,
+        likes: topicItem.likes,
+        liked_by: topicItem.likedBy,
+        tags: topicItem.tags
+      });
+    } catch (e) {
+      console.warn('Supabase auto-topic insert warning:', e);
+    }
+
     return newApp;
   };
 

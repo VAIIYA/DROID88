@@ -1057,7 +1057,7 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
 
       {activeTab === 'discussion' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-display font-bold text-slate-900 text-base">
                 Feedback & Feature Discussions ({appFeatures.length})
@@ -1065,6 +1065,25 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
               <p className="text-xs text-slate-500">
                 Community suggestions, feature proposals, and threaded discussions.
               </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={`mailto:droid88@googlegroups.com?subject=[${encodeURIComponent(app.name)}]%20Feedback%20/%20Question&body=Hi%20DROID88%20community,%0A%0ARegarding%20${encodeURIComponent(app.name)}%20(v${encodeURIComponent(app.versionName)}):%0A%0A`}
+                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+              >
+                <span>Email Google Group</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+              <a
+                href={app.googleGroupUrl || 'https://groups.google.com/g/droid88'}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+              >
+                <span>View Google Group</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
 

@@ -15,7 +15,11 @@ import {
   Sparkles, 
   Star,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Mail,
+  Flame,
+  Send
 } from 'lucide-react';
 
 interface AppCatalogProps {
@@ -45,7 +49,7 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
   onOpenPublish,
   onSelectDeveloper
 }) => {
-  const { apps, currentUser, enrollments } = useApp();
+  const { apps, currentUser, enrollments, featureFeedbacks } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'All' | AppCategory>('All');
@@ -183,6 +187,135 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
           <span>Join DROID88 Group</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
+      </div>
+
+      {/* Google Group Conversations & Community Hub */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display font-bold text-slate-900 text-sm sm:text-base">
+                  Google Group Conversations & App Discussions
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  groups.google.com/g/droid88
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Live conversations, closed testing announcements, and tester feedback for all DROID88 tracks.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="mailto:droid88@googlegroups.com?subject=[Discussion]%20Question%20/%20Feedback%20for%20DROID88%20Apps&body=Hi%20DROID88%20community,%0A%0A"
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Start New Conversation</span>
+            </a>
+            <a
+              href="https://groups.google.com/g/droid88"
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+            >
+              <span>Open Group</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {/* Live App Topics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {featureFeedbacks.slice(0, 6).map((item) => {
+            const linkedApp = apps.find(a => a.id === item.appId);
+            return (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/40 hover:border-emerald-200 transition flex flex-col justify-between space-y-2 group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                      {item.appName}
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white text-emerald-800 border border-slate-200 shrink-0">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-emerald-900 transition">
+                    {item.title}
+                  </h4>
+
+                  <p className="text-[11px] text-slate-600 line-clamp-2 mt-1">
+                    {item.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px]">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="flex items-center gap-1 font-semibold">
+                      <Flame className="w-3 h-3 text-amber-500" />
+                      {item.likes} upvotes
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3 text-slate-400" />
+                      {item.commentsCount}
+                    </span>
+                  </div>
+
+                  {linkedApp ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectApp(linkedApp)}
+                      className="text-emerald-700 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span>Join Track</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <a
+                      href="https://groups.google.com/g/droid88"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 font-bold hover:underline flex items-center gap-0.5"
+                    >
+                      <span>View Thread</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Quick Footer banner explaining how Google Group sync works */}
+        <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              Every published app automatically creates a discussion topic. Email <strong>droid88@googlegroups.com</strong> to start a thread from your inbox!
+            </span>
+          </div>
+          <a
+            href="https://groups.google.com/g/droid88"
+            target="_blank"
+            rel="noreferrer"
+            className="text-emerald-800 font-bold hover:underline whitespace-nowrap flex items-center gap-1"
+          >
+            <span>View All Topics on Google Groups</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
 
       {/* Filter and Search Bar (WooCommerce Shop Bar) */}

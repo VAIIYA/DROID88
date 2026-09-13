@@ -15,7 +15,6 @@ import { BugReportModal } from '@/components/BugReportModal';
 import { AutomatedFeedbackModal } from '@/components/AutomatedFeedbackModal';
 import { AppDetailPage } from '@/components/AppDetailPage';
 import { AppListing } from '@/types';
-import { Bug } from 'lucide-react';
 
 export type AppTab = 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics' | 'app_detail';
 
@@ -170,18 +169,6 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
         onOpenGoogleAuth={() => setIsAuthModalOpen(true)}
         onOpenOwnProfile={handleOpenOwnProfile}
       />
-
-      {/* Floating Quick Action: Report Bug with Screenshot button */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-        <button
-          onClick={() => handleOpenReportBug(apps[0])}
-          className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-xl shadow-rose-600/30 flex items-center gap-2 transition hover:scale-105 active:scale-95 cursor-pointer"
-          title="Report Bug with Screenshot"
-        >
-          <Bug className="w-4 h-4" />
-          <span>Report Bug + Screenshot</span>
-        </button>
-      </div>
 
       {/* Main View Router */}
       <main className="flex-1 pb-16">

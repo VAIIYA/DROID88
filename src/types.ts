@@ -52,7 +52,9 @@ export interface AppListing {
   category: AppCategory;
   shortDescription: string;
   fullDescription: string;
-  testingTrackUrl: string; // e.g. https://play.google.com/apps/testing/com.example.app
+  testingTrackUrl: string; // fallback or general link
+  webOptInUrl?: string; // https://play.google.com/apps/testing/<package> (Join on the web)
+  androidOptInUrl?: string; // https://play.google.com/store/apps/details?id=<package> (Join on Android)
   googleGroupUrl?: string;
   requiredTier: TesterTier;
   targetTesters: number; // e.g. 20 for Google Play requirement

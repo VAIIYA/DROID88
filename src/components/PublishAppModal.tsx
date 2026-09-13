@@ -43,11 +43,43 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
   const [shortDescription, setShortDescription] = useState('');
   const [fullDescription, setFullDescription] = useState('');
   const [testingTrackUrl, setTestingTrackUrl] = useState('');
+  const [webOptInUrl, setWebOptInUrl] = useState('');
+  const [androidOptInUrl, setAndroidOptInUrl] = useState('');
   const [googleGroupUrl, setGoogleGroupUrl] = useState('');
   const [requiredTier, setRequiredTier] = useState<TesterTier>('tier_1_standard');
   const [targetTesters, setTargetTesters] = useState(20);
   const [testDurationDays, setTestDurationDays] = useState(14);
   const [minAndroidVersion, setMinAndroidVersion] = useState('Android 11 (API 30)+');
+
+  // Auto-detect package name and dual URLs when pasting any Play link
+  const handleUrlOrPackageChange = (val: string) => {
+    setTestingTrackUrl(val);
+
+    let detectedPkg = '';
+    // Format 1: https://play.google.com/apps/testing/<pkg>
+    if (val.includes('/apps/testing/')) {
+      detectedPkg = val.split('/apps/testing/')[1]?.split('?')[0]?.split('#')[0] || '';
+    } 
+    // Format 2: https://play.google.com/store/apps/details?id=<pkg>
+    else if (val.includes('id=')) {
+      try {
+        const u = new URL(val);
+        detectedPkg = u.searchParams.get('id') || '';
+      } catch (e) {
+        // ignore
+      }
+    }
+    // Format 3: Raw package name like com.company.app
+    else if (/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/.test(val.trim())) {
+      detectedPkg = val.trim();
+    }
+
+    if (detectedPkg) {
+      if (!packageName) setPackageName(detectedPkg);
+      setWebOptInUrl(`https://play.google.com/apps/testing/${detectedPkg}`);
+      setAndroidOptInUrl(`https://play.google.com/store/apps/details?id=${detectedPkg}`);
+    }
+  };
   
   const [focusPoints, setFocusPoints] = useState<string[]>([
     'In-app billing and subscription restore testing',
@@ -81,8 +113,10 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       category,
       shortDescription,
       fullDescription,
-      testingTrackUrl,
-      googleGroupUrl: googleGroupUrl || undefined,
+      testingTrackUrl: testingTrackUrl.trim(),
+      webOptInUrl: webOptInUrl.trim() || `https://play.google.com/apps/testing/${packageName.trim().toLowerCase()}`,
+      androidOptInUrl: androidOptInUrl.trim() || `https://play.google.com/store/apps/details?id=${packageName.trim().toLowerCase()}`,
+      googleGroupUrl: googleGroupUrl ? googleGroupUrl.trim() : undefined,
       requiredTier,
       targetTesters: Number(targetTesters) || 20,
       testDurationDays: Number(testDurationDays) || 14,
@@ -140,19 +174,24 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Google Play Closed Testing Opt-in URL <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Google Play Track Opt-in or Package Name <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full">
+                  Auto-Detects Web & Android Links
+                </span>
+              </div>
               <input
-                type="url"
+                type="text"
                 value={testingTrackUrl}
-                onChange={(e) => setTestingTrackUrl(e.target.value)}
-                placeholder="https://play.google.com/apps/testing/com.yourcompany.app"
+                onChange={(e) => handleUrlOrPackageChange(e.target.value)}
+                placeholder="Paste Play Console URL or package name (e.g. com.company.app)"
                 className="w-full px-3.5 py-2.5 text-xs font-mono border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Found in Google Play Console &gt; Testing &gt; Closed testing &gt; Manage track &gt; Testers &gt; "How testers join your test" link.
+                Paste either link from Play Console &gt; Closed Testing &gt; Testers ("Join on Android" or "Join on the Web"). We will generate both automatically!
               </span>
             </div>
 
@@ -164,7 +203,13 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 <input
                   type="text"
                   value={packageName}
-                  onChange={(e) => setPackageName(e.target.value)}
+                  onChange={(e) => {
+                    const pkg = e.target.value.trim();
+                    setPackageName(pkg);
+                    if (pkg && !testingTrackUrl) {
+                      handleUrlOrPackageChange(pkg);
+                    }
+                  }}
                   placeholder="com.example.myapp"
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   required
@@ -173,7 +218,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Google Group URL (Optional)
+                  Google Group / Email List URL (Optional)
                 </label>
                 <input
                   type="url"
@@ -184,6 +229,23 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 />
               </div>
             </div>
+
+            {/* Preview Generated Links */}
+            {(webOptInUrl || androidOptInUrl) && (
+              <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+                  Generated Play Console Links for Testers:
+                </span>
+                <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px] truncate">
+                  <span className="font-sans font-bold text-slate-800 shrink-0">Web:</span>
+                  <span className="truncate">{webOptInUrl || `https://play.google.com/apps/testing/${packageName}`}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px] truncate">
+                  <span className="font-sans font-bold text-slate-800 shrink-0">Android:</span>
+                  <span className="truncate">{androidOptInUrl || `https://play.google.com/store/apps/details?id=${packageName}`}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* App Metadata */}

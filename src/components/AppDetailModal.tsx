@@ -171,12 +171,12 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
 
         {/* Closed Testing Opt-in & Recruitment Action Bar */}
         <div className="bg-emerald-50 border-b border-emerald-100 p-4 sm:p-5 shrink-0">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1.5 flex-1">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-2 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
                   <Smartphone className="w-4 h-4 text-emerald-700" />
-                  Google Play Closed Testing Track URL
+                  Google Play Closed Testing Opt-in Tracks
                 </span>
                 {app.googleGroupUrl && (
                   <a
@@ -185,35 +185,55 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
                     rel="noreferrer"
                     className="text-[11px] text-emerald-700 underline font-medium"
                   >
-                    (Join Google Group for access)
+                    (1. Join Google Group First)
                   </a>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-mono text-slate-700 shadow-xs max-w-xl">
-                <span className="truncate flex-1">{app.testingTrackUrl}</span>
-                <button
-                  onClick={handleCopyLink}
-                  className="text-emerald-700 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50 transition shrink-0 cursor-pointer"
-                  title="Copy testing opt-in URL"
-                >
-                  {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                </button>
+              {/* Dual Direct Play Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl">
+                {/* Web Opt-in */}
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-emerald-200 text-xs shadow-xs">
+                  <div className="truncate mr-2">
+                    <span className="font-bold text-slate-800 block text-[11px]">Join on the Web</span>
+                    <span className="text-[10px] text-slate-500 font-mono truncate block">
+                      {app.webOptInUrl || `https://play.google.com/apps/testing/${app.packageName}`}
+                    </span>
+                  </div>
+                  <a
+                    href={app.webOptInUrl || `https://play.google.com/apps/testing/${app.packageName}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <span>Opt-In</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                {/* Android Direct */}
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-emerald-200 text-xs shadow-xs">
+                  <div className="truncate mr-2">
+                    <span className="font-bold text-slate-800 block text-[11px]">Join on Android (Phone)</span>
+                    <span className="text-[10px] text-slate-500 font-mono truncate block">
+                      {app.androidOptInUrl || `https://play.google.com/store/apps/details?id=${app.packageName}`}
+                    </span>
+                  </div>
+                  <a
+                    href={app.androidOptInUrl || `https://play.google.com/store/apps/details?id=${app.packageName}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <span>Play Store</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
 
             {/* Main Action buttons */}
             <div className="flex flex-wrap items-center gap-2">
-              <a
-                href={app.testingTrackUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs"
-              >
-                <span>Opt-in on Play Store</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-
               {isEnrolled ? (
                 <div className="flex items-center gap-2">
                   <button
@@ -231,7 +251,7 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
 
                   <button
                     onClick={() => unenrollFromApp(app.id)}
-                    className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition"
+                    className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition cursor-pointer"
                   >
                     Leave
                   </button>
@@ -240,14 +260,14 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
                 <button
                   onClick={handleEnroll}
                   disabled={!hasAccess}
-                  className={`px-5 py-2 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md ${
+                  className={`px-5 py-2.5 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md ${
                     hasAccess
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-700/20'
                       : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   }`}
                 >
                   <Users className="w-4 h-4" />
-                  <span>{hasAccess ? 'Enroll as Tester' : 'Tier Locked'}</span>
+                  <span>{hasAccess ? '1-Click Enroll in Droid88' : 'Tier Locked'}</span>
                 </button>
               )}
             </div>

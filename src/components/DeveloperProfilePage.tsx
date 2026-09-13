@@ -161,10 +161,10 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
         {/* Cover Canvas Gradient */}
         <div className="h-44 sm:h-52 bg-gradient-to-r from-slate-900 via-indigo-950 to-emerald-950 relative p-6 flex items-end justify-between">
           <div className="absolute top-4 right-4 flex items-center gap-2">
-            {/* Cloud Firestore Persistence Pill */}
+            {/* Supabase Cloud Profile Pill */}
             <span className="bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] px-3 py-1 rounded-full flex items-center gap-1.5 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Firestore Persistent Profile</span>
+              <span>Supabase Cloud Profile</span>
             </span>
 
             {profileUser.verifiedDeveloper && (

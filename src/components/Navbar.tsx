@@ -5,11 +5,13 @@ import {
   Store, 
   LayoutDashboard, 
   MessageSquareHeart, 
+  MessageSquare,
   TrendingUp, 
   PlusCircle, 
   ShieldCheck, 
   CheckCircle, 
   Building2,
+  Users,
   LogIn
 } from 'lucide-react';
 
@@ -48,8 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const tierBadge = getTierBadge(currentUser.testerTier);
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-      {/* WordPress / WooCommerce Style Top Notification Bar */}
+    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs w-full overflow-hidden">
+      {/* Top Notification Bar */}
       <div className="bg-slate-900 text-slate-200 text-xs py-1.5 px-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -57,21 +59,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               <CheckCircle className="w-3 h-3" />
               Google Play 14-Day 20-Tester Hub
             </span>
-            <span className="hidden sm:inline text-slate-400">
-              Persistent developer studio accounts with Supabase Auth & PostgreSQL profile sync.
+            <span className="hidden md:inline text-slate-400">
+              Android Closed Testing Exchange & Community
             </span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
-            <span className="text-slate-400 hidden md:inline">
-              Testing Hub Status: <strong className="text-emerald-400 font-semibold">{apps.length} Active Tracks</strong>
+            <span className="text-slate-400 hidden sm:inline">
+              <strong className="text-emerald-400 font-semibold">{apps.length} Tracks</strong> Active
             </span>
             <button
               onClick={onOpenGoogleAuth}
-              className="text-slate-300 hover:text-white underline transition flex items-center gap-1.5 cursor-pointer"
+              className="text-slate-300 hover:text-white underline transition flex items-center gap-1.5 cursor-pointer max-w-[220px] sm:max-w-none truncate"
             >
-              <span>Developer Account: <strong>{currentUser.developerAccountName || currentUser.name}</strong></span>
-              <span className="text-emerald-400">({currentUser.role})</span>
+              <span className="truncate">{currentUser.developerAccountName || currentUser.name}</span>
+              <span className="text-emerald-400 shrink-0">({currentUser.role})</span>
             </button>
           </div>
         </div>
@@ -79,72 +81,66 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo */}
-          <div className="flex items-center gap-3 shrink-0 cursor-pointer" onClick={() => setActiveTab('catalog')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
-              <Smartphone className="w-6 h-6" />
+          <div className="flex items-center gap-2.5 shrink-0 cursor-pointer" onClick={() => setActiveTab('catalog')}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
+              <Smartphone className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-black text-xl tracking-tight text-slate-900">
                   DROID<span className="text-emerald-600">88</span>
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                  Track Hub
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Beta
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 -mt-0.5">Android Closed Testing Community</p>
+              <p className="text-[10px] text-slate-500 -mt-0.5 hidden sm:block">Closed Testing Community</p>
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links (Desktop) */}
           <nav className="hidden lg:flex items-center gap-1">
             <button
               onClick={() => setActiveTab('catalog')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'catalog'
                   ? 'bg-slate-100 text-slate-900 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <Store className="w-4 h-4 text-emerald-600" />
-              <span>App Tracks</span>
-              <span className="text-xs px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+              <span>Catalog</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
                 {apps.length}
               </span>
             </button>
 
-            {/* Dedicated Developer Profile Tab */}
             <button
               onClick={onOpenOwnProfile}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'dev_profile'
                   ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <Building2 className="w-4 h-4 text-emerald-600" />
-              <span>Developer Profile</span>
-              {currentUser.developerAccountName && (
-                <span className="text-[11px] px-1.5 py-0.2 rounded-md bg-emerald-100/80 text-emerald-800 font-semibold max-w-[120px] truncate">
-                  {currentUser.developerAccountName}
-                </span>
-              )}
+              <span>Dev Studio</span>
             </button>
 
             <button
               onClick={() => setActiveTab('tester_hub')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'tester_hub'
                   ? 'bg-slate-100 text-slate-900 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <Smartphone className="w-4 h-4 text-indigo-600" />
-              <span>Tester Hub</span>
+              <Users className="w-4 h-4 text-blue-600" />
+              <span>14-Day Tester Hub</span>
               {myEnrolledApps.length > 0 && (
-                <span className="text-xs px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 font-bold">
                   {myEnrolledApps.length}
                 </span>
               )}
@@ -152,36 +148,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setActiveTab('dev_dashboard')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'dev_dashboard'
                   ? 'bg-slate-100 text-slate-900 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4 text-blue-600" />
-              <span>Dev Dashboard</span>
-              {myDevApps.length > 0 && (
-                <span className="text-xs px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 font-semibold">
-                  {myDevApps.length}
-                </span>
-              )}
+              <ShieldCheck className="w-4 h-4 text-purple-600" />
+              <span>Developer Console</span>
             </button>
 
             <button
               onClick={() => setActiveTab('community')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'community'
                   ? 'bg-slate-100 text-slate-900 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <MessageSquareHeart className="w-4 h-4 text-rose-500" />
-              <span>Community Feedback</span>
+              <MessageSquare className="w-4 h-4 text-indigo-500" />
+              <span>Feature Board</span>
             </button>
 
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'analytics'
                   ? 'bg-slate-100 text-slate-900 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'

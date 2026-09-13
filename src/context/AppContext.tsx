@@ -49,7 +49,7 @@ interface AppContextType {
   updateUserRole: (role: UserRole) => void;
   updateTesterTier: (tier: TesterTier) => void;
   publishApp: (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>) => Promise<AppListing>;
-  enrollInApp: (appId: string, deviceModel: string, osVersion: string) => Promise<void>;
+  enrollInApp: (appId: string, deviceModel: string, osVersion: string) => Promise<boolean>;
   unenrollFromApp: (appId: string) => Promise<void>;
   performDailyCheckin: (appId: string) => Promise<boolean>;
   reportBug: (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>) => Promise<BugReport>;
@@ -599,9 +599,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newApp;
   };
 
-  const enrollInApp = async (appId: string, deviceModel: string, osVersion: string) => {
+  const enrollInApp = async (appId: string, deviceModel: string, osVersion: string): Promise<boolean> => {
+    if (!currentUser) return false;
     const app = apps.find(a => a.id === appId);
-    if (!app) return;
+    if (!app) return false;
 
     const today = new Date().toISOString().split('T')[0];
     const newEnrollment: TesterEnrollment = {
@@ -658,6 +659,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Supabase enrollment insert warning:', e);
     }
+
+    return true;
   };
 
   const unenrollFromApp = async (appId: string) => {

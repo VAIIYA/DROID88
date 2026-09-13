@@ -17,9 +17,13 @@ import {
   ThumbsUp, 
   Flame, 
   Image as ImageIcon,
-  Building2
+  Building2,
+  AlertCircle,
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GoogleAuthModal } from './GoogleAuthModal';
 
 interface AppDetailPageProps {
   app: AppListing;
@@ -53,6 +57,7 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
   const [selectedDevice, setSelectedDevice] = useState(currentUser?.deviceInfo?.model || 'Google Pixel 8 Pro');
   const [selectedOs, setSelectedOs] = useState(currentUser?.deviceInfo?.osVersion || 'Android 14 (API 34)');
   const [justEnrolled, setJustEnrolled] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const currentEnrollment = currentUser 
     ? enrollments.find(e => e.appId === app.id && e.testerId === currentUser.id)
@@ -86,19 +91,21 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
     }
   };
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (!currentUser) {
-      signInWithSupabaseGithub();
+      setIsAuthModalOpen(true);
       return;
     }
-    enrollInApp(app.id, selectedDevice, selectedOs);
-    setJustEnrolled(true);
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 }
-    });
-    setTimeout(() => setJustEnrolled(false), 4000);
+    const success = await enrollInApp(app.id, selectedDevice, selectedOs);
+    if (success) {
+      setJustEnrolled(true);
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 }
+      });
+      setTimeout(() => setJustEnrolled(false), 4000);
+    }
   };
 
   const handleCheckin = () => {
@@ -320,6 +327,28 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
                     <span>Play Store</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
+                </div>
+              </div>
+
+              {/* Google Play Opt-in Requirements Helper Notice */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 max-w-2xl mt-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-semibold text-amber-950 block">Why does Google Play show &ldquo;App not available&rdquo; or &ldquo;URL not found&rdquo;?</span>
+                  <p className="text-amber-800 leading-relaxed">
+                    Google Play Closed Testing tracks are strictly private. Before you can open the opt-in link, your Google Account must be a member of the developer&apos;s <strong>Google Group</strong> (or added to their Console tester email list), and Google must finish reviewing their closed testing release. Once joined with the same Google Account you use on your Android phone, the link unlocks immediately.
+                  </p>
+                  {app.googleGroupUrl && (
+                    <a 
+                      href={app.googleGroupUrl} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="inline-flex items-center gap-1 font-bold text-emerald-800 hover:text-emerald-950 underline pt-0.5"
+                    >
+                      <span>Join {app.name}&apos;s Google Group Now</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -750,6 +779,11 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
           )}
         </div>
       )}
+      {/* Authentication Modal */}
+      <GoogleAuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
     </div>
   );
 };

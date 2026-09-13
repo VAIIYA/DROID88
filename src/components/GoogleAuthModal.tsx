@@ -259,7 +259,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
                 required
               />
               <span className="text-[10px] text-indigo-800/80 block">
-                This public developer name is stored in Firestore and shown on all your closed tracks.
+                This public developer name is stored in Supabase and shown on all your closed tracks.
               </span>
             </div>
           )}

@@ -21,7 +21,10 @@ import {
   Bug,
   Flame,
   ArrowRight,
-  ChevronRight
+  ChevronRight,
+  Share2,
+  Check,
+  Copy
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -60,6 +63,22 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleShareProfile = async () => {
+    const url = typeof window !== 'undefined'
+      ? `${window.location.origin}/profile/${profileUser.id}`
+      : `https://droid88.vercel.app/profile/${profileUser.id}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+      }
+    } catch (err) {
+      console.error('Failed to copy URL:', err);
+    }
+  };
 
   // Form Fields
   const [developerAccountName, setDeveloperAccountName] = useState(profileUser.developerAccountName || `${profileUser.name} Studios`);
@@ -210,6 +229,15 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
 
             {/* Profile Action Buttons */}
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleShareProfile}
+                className="px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                title="Copy direct shareable profile URL"
+              >
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
+                <span>{isCopied ? 'Link Copied!' : 'Share Profile'}</span>
+              </button>
+
               {isOwnProfile && (
                 <>
                   <button
@@ -221,7 +249,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                     }`}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
-                    <span>{isEditing ? 'Cancel Editing' : 'Edit Developer Name & Details'}</span>
+                    <span>{isEditing ? 'Cancel Editing' : 'Edit Developer Details'}</span>
                   </button>
 
                   <button
@@ -240,7 +268,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-xs text-emerald-900 animate-fadeIn">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
               <div>
-                <strong>Developer Profile Updated!</strong> Your developer account name and studio details have been synchronized persistently to Cloud Firestore.
+                <strong>Developer Profile Updated!</strong> Your developer account name and studio details have been synchronized persistently to Supabase.
               </div>
             </div>
           )}
@@ -260,14 +288,20 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900">
-                      {supabaseUser ? `Connected as ${supabaseUser.email}` : `Persistent Google Profile (${currentUser.email})`}
+                      {supabaseUser ? `Connected as ${supabaseUser.email}` : 'Google Account Not Connected'}
                     </span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full">
-                      {supabaseUser ? 'Supabase Auth Live' : 'Active Account'}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      supabaseUser 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                    }`}>
+                      {supabaseUser ? 'Supabase Live' : 'Demo / Guest Profile'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 block">
-                    Developer credentials and published tracks are linked to this Google identity.
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    {supabaseUser 
+                      ? 'Developer credentials and published tracks are linked to this Google Supabase account.'
+                      : 'Sign in with Google to sync your tracks, feedback, and verified badge to Supabase.'}
                   </span>
                 </div>
               </div>
@@ -275,16 +309,20 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleGoogleConnect}
-                  className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                    supabaseUser
+                      ? 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-300'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
                   <span>{supabaseUser ? 'Switch Google Account' : 'Sign in with Google'}</span>
                 </button>
 
                 {supabaseUser && (
                   <button
                     onClick={signOutFromSupabase}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
                     title="Sign Out from Supabase"
                   >
                     <LogOut className="w-4 h-4" />
@@ -320,7 +358,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isSaving ? 'Saving to Firestore...' : 'Save Changes'}</span>
+                  <span>{isSaving ? 'Saving to Supabase...' : 'Save Changes'}</span>
                 </button>
               </div>
 

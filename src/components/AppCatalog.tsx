@@ -55,6 +55,7 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
 
   // Check user tier permissions
   const canAccessTier = (requiredTier: TesterTier): boolean => {
+    if (!currentUser) return true;
     if (currentUser.role === 'developer') return true;
     if (requiredTier === 'tier_1_standard') return true;
     if (requiredTier === 'tier_2_verified') {
@@ -254,7 +255,7 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
       {/* Catalog Grid (WooCommerce style product cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredApps.map((app) => {
-          const isEnrolled = enrollments.some(e => e.appId === app.id && e.testerId === currentUser.id);
+          const isEnrolled = currentUser ? enrollments.some(e => e.appId === app.id && e.testerId === currentUser.id) : false;
           const hasAccess = canAccessTier(app.requiredTier);
           const tierInfo = getTierInfo(app.requiredTier);
           const testersPercent = Math.min(100, Math.round((app.currentTesters / app.targetTesters) * 100));

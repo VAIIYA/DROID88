@@ -42,6 +42,7 @@ interface AppContextType {
   loginWithGoogle: (email: string, name: string, role: UserRole, testerTier: TesterTier, developerAccountName?: string) => void;
   signInWithSupabaseGoogle: () => Promise<void>;
   signInWithSupabaseGithub: () => Promise<void>;
+  signInWithSupabaseOtp: (email: string) => Promise<void>;
   signOutFromSupabase: () => Promise<void>;
   uploadFileToStorage: (bucket: 'app-icons' | 'bug-screenshots', file: File) => Promise<string | null>;
   updateDeveloperProfile: (profileData: Partial<User>) => Promise<void>;
@@ -382,6 +383,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch (err) {
       console.error('Supabase GitHub Sign-In error:', err);
+      throw err;
+    }
+  };
+
+  const signInWithSupabaseOtp = async (email: string) => {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Supabase Email OTP error:', err);
       throw err;
     }
   };
@@ -996,6 +1013,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loginWithGoogle,
       signInWithSupabaseGoogle,
       signInWithSupabaseGithub,
+      signInWithSupabaseOtp,
       signOutFromSupabase,
       uploadFileToStorage,
       updateDeveloperProfile,

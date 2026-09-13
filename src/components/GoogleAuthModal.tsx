@@ -10,7 +10,9 @@ import {
   Sparkles, 
   AlertCircle,
   LogOut,
-  Users
+  Users,
+  Mail,
+  ArrowRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -22,13 +24,15 @@ interface GoogleAuthModalProps {
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClose }) => {
   const { 
     currentUser, 
-    signInWithSupabaseGoogle, 
     signInWithSupabaseGithub,
+    signInWithSupabaseOtp,
     signOutFromSupabase,
     supabaseUser 
   } = useApp();
 
-  const [isSigningIn, setIsSigningIn] = useState<'github' | 'google' | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState<'github' | 'email' | null>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -45,14 +49,26 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsSigningIn('google');
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput || !emailInput.includes('@')) {
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+    setIsSigningIn('email');
     setAuthError(null);
     try {
-      await signInWithSupabaseGoogle();
+      await signInWithSupabaseOtp(emailInput.trim());
+      setEmailSent(true);
+      confetti({
+        particleCount: 40,
+        spread: 50,
+        origin: { y: 0.6 }
+      });
     } catch (err: any) {
-      console.error('Supabase Google Auth error:', err);
-      setAuthError(err.message || 'Google Sign-in was cancelled or encountered an error.');
+      console.error('Supabase Email Sign-in error:', err);
+      setAuthError(err.message || 'Could not send login link. Please try again.');
+    } finally {
       setIsSigningIn(null);
     }
   };
@@ -152,7 +168,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
             /* Visitor: Log in or Register state */
             <div className="space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed">
-                Connect with your Google account to publish Android closed testing tracks, recruit 20 verified testers for 14 continuous days, or earn QA reputation by testing indie apps.
+                Connect with your GitHub account or Email to publish Android closed testing tracks, recruit 20 verified testers for 14 continuous days, or earn QA reputation by testing indie apps.
               </p>
 
               {/* Value propositions */}
@@ -191,27 +207,47 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
                 <span>{isSigningIn === 'github' ? 'Connecting to GitHub...' : 'Continue with GitHub'}</span>
               </button>
 
-              {/* Secondary Google Button */}
+              {/* Divider */}
               <div className="relative flex py-1 items-center">
                 <div className="grow border-t border-slate-200"></div>
-                <span className="shrink mx-3 text-slate-400 text-[10px] uppercase font-bold tracking-wider">or</span>
+                <span className="shrink mx-3 text-slate-400 text-[10px] uppercase font-bold tracking-wider">or email magic link</span>
                 <div className="grow border-t border-slate-200"></div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isSigningIn !== null}
-                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl shadow-2xs flex items-center justify-center gap-2.5 transition cursor-pointer border border-slate-200"
-              >
-                <svg viewBox="0 0 24 24" className="w-4 h-4">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>{isSigningIn === 'google' ? 'Connecting to Google...' : 'Continue with Google'}</span>
-              </button>
+              {/* Email Form */}
+              {emailSent ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2 animate-fadeIn">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-bold text-xs text-emerald-900">Check Your Email</h4>
+                  <p className="text-[11px] text-emerald-700">
+                    We sent a secure login link to <strong>{emailInput}</strong>. Click it to log in instantly!
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleEmailSignIn} className="space-y-2">
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="developer@yourstudio.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSigningIn !== null}
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <span>{isSigningIn === 'email' ? 'Sending Magic Link...' : 'Send Magic Link'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+              )}
 
               {authError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2 animate-fadeIn">
@@ -221,7 +257,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
               )}
 
               <p className="text-[11px] text-slate-400 text-center">
-                Securely authenticated with Supabase. We only access your public profile and verified email.
+                Securely authenticated with Supabase. Password-free instant login.
               </p>
             </div>
           )}

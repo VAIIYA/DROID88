@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics';
-  setActiveTab: (tab: 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics') => void;
+  activeTab: 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics' | 'app_detail';
+  setActiveTab: (tab: any) => void;
   onOpenPublish: () => void;
   onOpenGoogleAuth: () => void;
   onOpenOwnProfile: () => void;

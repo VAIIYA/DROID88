@@ -11,28 +11,31 @@ import { CommunityFeedbackBoard } from '@/components/CommunityFeedbackBoard';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { GoogleAuthModal } from '@/components/GoogleAuthModal';
 import { PublishAppModal } from '@/components/PublishAppModal';
-import { AppDetailModal } from '@/components/AppDetailModal';
 import { BugReportModal } from '@/components/BugReportModal';
 import { AutomatedFeedbackModal } from '@/components/AutomatedFeedbackModal';
+import { AppDetailPage } from '@/components/AppDetailPage';
 import { AppListing } from '@/types';
 import { Bug } from 'lucide-react';
 
-export type AppTab = 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics';
+export type AppTab = 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics' | 'app_detail';
 
 export interface Droid88HubProps {
   initialTab?: AppTab;
   initialDeveloperId?: string | null;
+  initialAppId?: string | null;
 }
 
 export const Droid88Hub: React.FC<Droid88HubProps> = ({
   initialTab = 'catalog',
-  initialDeveloperId = null
+  initialDeveloperId = null,
+  initialAppId = null
 }) => {
   const { apps, resetToSampleData } = useApp();
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<AppTab>(initialTab);
   const [targetDeveloperId, setTargetDeveloperId] = useState<string | null>(initialDeveloperId);
+  const [targetAppId, setTargetAppId] = useState<string | null>(initialAppId);
 
   // Modals state
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -44,25 +47,28 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
   const [feedbackModalApp, setFeedbackModalApp] = useState<AppListing | null>(null);
   const [feedbackModalPhase, setFeedbackModalPhase] = useState<'day_1' | 'day_3' | 'day_7' | 'day_14'>('day_1');
 
-  const [selectedDetailApp, setSelectedDetailApp] = useState<AppListing | null>(null);
-
   // Sync state if props change (e.g. Next.js route navigation)
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
     if (initialDeveloperId !== undefined) setTargetDeveloperId(initialDeveloperId);
-  }, [initialTab, initialDeveloperId]);
+    if (initialAppId !== undefined) setTargetAppId(initialAppId);
+  }, [initialTab, initialDeveloperId, initialAppId]);
 
   // Support browser back/forward buttons and query params on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     // Check query params if not set by props
-    if (!initialDeveloperId) {
+    if (!initialDeveloperId && !initialAppId) {
       const searchParams = new URLSearchParams(window.location.search);
       const devParam = searchParams.get('dev') || searchParams.get('profile');
+      const appParam = searchParams.get('app');
       const tabParam = searchParams.get('tab') as AppTab;
 
-      if (devParam) {
+      if (appParam) {
+        setTargetAppId(appParam);
+        setActiveTab('app_detail');
+      } else if (devParam) {
         setTargetDeveloperId(devParam);
         setActiveTab('dev_profile');
       } else if (tabParam) {
@@ -72,7 +78,11 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
 
     const handlePopState = () => {
       const path = window.location.pathname;
-      if (path.startsWith('/profile/')) {
+      if (path.startsWith('/app/')) {
+        const id = path.replace('/app/', '');
+        setTargetAppId(id);
+        setActiveTab('app_detail');
+      } else if (path.startsWith('/profile/')) {
         const id = path.replace('/profile/', '');
         setTargetDeveloperId(id);
         setActiveTab('dev_profile');
@@ -88,7 +98,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [initialDeveloperId]);
+  }, [initialDeveloperId, initialAppId]);
 
   // Handlers
   const handleOpenReportBug = (app?: AppListing) => {
@@ -107,6 +117,15 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
     setActiveTab('dev_profile');
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', `/profile/${developerId}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleOpenAppDetail = (app: AppListing) => {
+    setTargetAppId(app.id);
+    setActiveTab('app_detail');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', `/app/${app.id}`);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -130,6 +149,10 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
           window.history.pushState({}, '', `/profile/${targetDeveloperId}`);
         } else {
           window.history.pushState({}, '', '/profile');
+        }
+      } else if (tab === 'app_detail') {
+        if (targetAppId) {
+          window.history.pushState({}, '', `/app/${targetAppId}`);
         }
       } else {
         window.history.pushState({}, '', `/?tab=${tab}`);
@@ -164,7 +187,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
       <main className="flex-1 pb-16">
         {activeTab === 'catalog' && (
           <AppCatalog
-            onSelectApp={(app) => setSelectedDetailApp(app)}
+            onSelectApp={handleOpenAppDetail}
             onOpenReportBug={handleOpenReportBug}
             onOpenFeedback={(app) => handleOpenFeedback(app, 'day_1')}
             onOpenPublish={() => setIsPublishModalOpen(true)}
@@ -172,9 +195,38 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
           />
         )}
 
+        {activeTab === 'app_detail' && (
+          (() => {
+            const currentApp = apps.find(a => a.id === targetAppId) || apps[0];
+            if (!currentApp) {
+              return (
+                <div className="max-w-xl mx-auto py-16 text-center">
+                  <h2 className="text-lg font-bold text-slate-900">App Not Found</h2>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">The requested app could not be located.</p>
+                  <button
+                    onClick={() => handleTabChange('catalog')}
+                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                  >
+                    Back to Catalog
+                  </button>
+                </div>
+              );
+            }
+            return (
+              <AppDetailPage
+                app={currentApp}
+                onBack={() => handleTabChange('catalog')}
+                onOpenReportBug={handleOpenReportBug}
+                onOpenFeedback={handleOpenFeedback}
+                onSelectDeveloper={handleOpenDeveloperProfile}
+              />
+            );
+          })()
+        )}
+
         {activeTab === 'tester_hub' && (
           <TesterHub
-            onSelectApp={(app) => setSelectedDetailApp(app)}
+            onSelectApp={handleOpenAppDetail}
             onOpenReportBug={handleOpenReportBug}
             onOpenFeedback={handleOpenFeedback}
             onExploreCatalog={() => handleTabChange('catalog')}
@@ -183,7 +235,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
 
         {activeTab === 'dev_dashboard' && (
           <DeveloperDashboard
-            onSelectApp={(app) => setSelectedDetailApp(app)}
+            onSelectApp={handleOpenAppDetail}
             onOpenPublish={() => setIsPublishModalOpen(true)}
           />
         )}
@@ -192,7 +244,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
           <DeveloperProfilePage
             targetDeveloperId={targetDeveloperId || undefined}
             onOpenPublishModal={() => setIsPublishModalOpen(true)}
-            onSelectApp={(app) => setSelectedDetailApp(app)}
+            onSelectApp={handleOpenAppDetail}
             onBackToCatalog={() => handleTabChange('catalog')}
           />
         )}
@@ -278,25 +330,6 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
           handleTabChange('dev_dashboard');
         }}
       />
-
-      {selectedDetailApp && (
-        <AppDetailModal
-          app={selectedDetailApp}
-          onClose={() => setSelectedDetailApp(null)}
-          onOpenReportBug={(app) => {
-            setSelectedDetailApp(null);
-            handleOpenReportBug(app);
-          }}
-          onOpenFeedback={(app, phase) => {
-            setSelectedDetailApp(null);
-            handleOpenFeedback(app, phase);
-          }}
-          onSelectDeveloper={(devId) => {
-            setSelectedDetailApp(null);
-            handleOpenDeveloperProfile(devId);
-          }}
-        />
-      )}
 
       <BugReportModal
         isOpen={isBugReportModalOpen}

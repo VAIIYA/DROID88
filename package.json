@@ -24,8 +24,10 @@
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "pg": "^8.23.0",
     "postcss": "^8.5.3",
     "typescript": "~5.8.2"
   }

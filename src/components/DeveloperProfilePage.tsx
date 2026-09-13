@@ -43,9 +43,9 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     allUsers, 
     apps, 
     updateDeveloperProfile, 
-    signInWithFirebaseGoogle, 
-    signOutFromFirebase,
-    firebaseUser 
+    signInWithSupabaseGoogle, 
+    signOutFromSupabase,
+    supabaseUser 
   } = useApp();
 
   // Determine which developer profile we are looking at
@@ -132,14 +132,14 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
   const handleGoogleConnect = async () => {
     setAuthError(null);
     try {
-      await signInWithFirebaseGoogle();
+      await signInWithSupabaseGoogle();
       confetti({
-        particleCount: 60,
-        spread: 70,
-        origin: { y: 0.5 }
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 }
       });
     } catch (err: any) {
-      console.error('Firebase Auth error:', err);
+      console.error('Supabase Auth error:', err);
       setAuthError(err.message || 'Google Sign-in was cancelled or blocked by popup settings.');
     }
   };
@@ -260,10 +260,10 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900">
-                      {firebaseUser ? `Connected as ${firebaseUser.email}` : `Persistent Google Profile (${currentUser.email})`}
+                      {supabaseUser ? `Connected as ${supabaseUser.email}` : `Persistent Google Profile (${currentUser.email})`}
                     </span>
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full">
-                      {firebaseUser ? 'Firebase Auth Live' : 'Active Account'}
+                      {supabaseUser ? 'Supabase Auth Live' : 'Active Account'}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-500 block">
@@ -278,14 +278,14 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                   className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{firebaseUser ? 'Switch Google Account' : 'Sign in with Google'}</span>
+                  <span>{supabaseUser ? 'Switch Google Account' : 'Sign in with Google'}</span>
                 </button>
 
-                {firebaseUser && (
+                {supabaseUser && (
                   <button
-                    onClick={signOutFromFirebase}
+                    onClick={signOutFromSupabase}
                     className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
-                    title="Sign Out from Firebase"
+                    title="Sign Out from Supabase"
                   >
                     <LogOut className="w-4 h-4" />
                   </button>

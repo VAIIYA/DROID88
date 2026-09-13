@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGoogleAuth,
   onOpenOwnProfile
 }) => {
-  const { currentUser, apps, enrollments, firebaseUser } = useApp();
+  const { currentUser, apps, enrollments, supabaseUser } = useApp();
 
   // Calculate active counts
   const myEnrolledApps = enrollments.filter(e => e.testerId === currentUser.id);
@@ -58,7 +58,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Google Play 14-Day 20-Tester Hub
             </span>
             <span className="hidden sm:inline text-slate-400">
-              Persistent developer studio accounts with Firebase Auth & Cloud Firestore profile sync.
+              Persistent developer studio accounts with Supabase Auth & PostgreSQL profile sync.
             </span>
           </div>
 

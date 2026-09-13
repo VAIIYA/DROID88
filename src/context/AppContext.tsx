@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   User, 
@@ -21,18 +23,8 @@ import {
   INITIAL_COMMENTS, 
   INITIAL_AUTOMATED_FEEDBACKS 
 } from '../data/mockData';
-import { 
-  auth, 
-  googleAuthProvider, 
-  signInWithPopup, 
-  firebaseSignOut, 
-  onAuthStateChanged,
-  db,
-  doc,
-  getDoc,
-  setDoc,
-  FirebaseUser
-} from '../firebase';
+import { supabase } from '../lib/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AppContextType {
   currentUser: User;
@@ -43,27 +35,28 @@ interface AppContextType {
   comments: FeedbackComment[];
   automatedFeedbacks: AutomatedFeedbackSubmission[];
   enrollments: TesterEnrollment[];
-  firebaseUser: FirebaseUser | null;
-  isFirebaseLoading: boolean;
+  supabaseUser: SupabaseUser | null;
+  isSupabaseLoading: boolean;
   setCurrentUser: (user: User) => void;
   switchUser: (userId: string) => void;
   loginWithGoogle: (email: string, name: string, role: UserRole, testerTier: TesterTier, developerAccountName?: string) => void;
-  signInWithFirebaseGoogle: () => Promise<User | null>;
-  signOutFromFirebase: () => Promise<void>;
+  signInWithSupabaseGoogle: () => Promise<void>;
+  signOutFromSupabase: () => Promise<void>;
+  uploadFileToStorage: (bucket: 'app-icons' | 'bug-screenshots', file: File) => Promise<string | null>;
   updateDeveloperProfile: (profileData: Partial<User>) => Promise<void>;
   updateUserRole: (role: UserRole) => void;
   updateTesterTier: (tier: TesterTier) => void;
-  publishApp: (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>) => AppListing;
-  enrollInApp: (appId: string, deviceModel: string, osVersion: string) => void;
-  unenrollFromApp: (appId: string) => void;
-  performDailyCheckin: (appId: string) => boolean;
-  reportBug: (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>) => BugReport;
-  updateBugStatus: (bugId: string, status: BugStatus, notes?: string) => void;
-  submitAutomatedFeedback: (feedback: Omit<AutomatedFeedbackSubmission, 'id' | 'testerId' | 'testerName' | 'testerTier' | 'submittedAt'>) => AutomatedFeedbackSubmission;
-  createFeatureFeedback: (data: Omit<FeatureFeedbackItem, 'id' | 'authorId' | 'authorName' | 'authorAvatar' | 'authorRole' | 'likes' | 'likedBy' | 'commentsCount' | 'createdAt'>) => FeatureFeedbackItem;
+  publishApp: (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>) => Promise<AppListing>;
+  enrollInApp: (appId: string, deviceModel: string, osVersion: string) => Promise<void>;
+  unenrollFromApp: (appId: string) => Promise<void>;
+  performDailyCheckin: (appId: string) => Promise<boolean>;
+  reportBug: (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>) => Promise<BugReport>;
+  updateBugStatus: (bugId: string, status: BugStatus, notes?: string) => Promise<void>;
+  submitAutomatedFeedback: (feedback: Omit<AutomatedFeedbackSubmission, 'id' | 'testerId' | 'testerName' | 'testerTier' | 'submittedAt'>) => Promise<AutomatedFeedbackSubmission>;
+  createFeatureFeedback: (data: Omit<FeatureFeedbackItem, 'id' | 'authorId' | 'authorName' | 'authorAvatar' | 'authorRole' | 'likes' | 'likedBy' | 'commentsCount' | 'createdAt'>) => Promise<FeatureFeedbackItem>;
   toggleLikeFeatureFeedback: (feedbackId: string) => void;
   updateFeatureStatus: (feedbackId: string, status: FeedbackStatus) => void;
-  addComment: (feedbackId: string, content: string) => FeedbackComment;
+  addComment: (feedbackId: string, content: string) => Promise<FeedbackComment>;
   toggleLikeComment: (commentId: string) => void;
   resetToDefaults: () => void;
   resetToSampleData: () => void;
@@ -71,16 +64,16 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'droid88_state_v1';
-const LEGACY_STORAGE_KEY = 'droidclosed_state_v1';
+const LOCAL_STORAGE_KEY = 'droid88_state_v2';
 
 const getSavedItem = (suffix: string): string | null => {
-  return localStorage.getItem(`${LOCAL_STORAGE_KEY}_${suffix}`) || localStorage.getItem(`${LEGACY_STORAGE_KEY}_${suffix}`);
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(`${LOCAL_STORAGE_KEY}_${suffix}`);
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [isFirebaseLoading, setIsFirebaseLoading] = useState<boolean>(true);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [isSupabaseLoading, setIsSupabaseLoading] = useState<boolean>(true);
 
   const [allUsers, setAllUsers] = useState<User[]>(() => {
     const saved = getSavedItem('users');
@@ -158,173 +151,249 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ];
   });
 
-  // Listen to Firebase Auth state
+  // Supabase Auth listener & initial profile sync
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
-      setIsFirebaseLoading(false);
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user ?? null;
+        setSupabaseUser(user);
 
-      if (fbUser) {
-        try {
-          // Fetch persistent user document from Firestore
-          const userDocRef = doc(db, 'users', fbUser.uid);
-          const userSnap = await getDoc(userDocRef);
+        if (user) {
+          // Fetch user profile from Supabase
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-          if (userSnap.exists()) {
-            const data = userSnap.data() as User;
-            setCurrentUser(data);
-            setAllUsers(prev => {
-              const exists = prev.some(u => u.id === data.id || u.firebaseUid === fbUser.uid);
-              if (exists) {
-                return prev.map(u => (u.id === data.id || u.firebaseUid === fbUser.uid) ? data : u);
+          if (profile) {
+            const mappedUser: User = {
+              id: profile.id,
+              name: profile.name,
+              developerAccountName: profile.developer_account_name,
+              email: profile.email,
+              avatar: profile.avatar || user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.id)}`,
+              role: profile.role,
+              testerTier: profile.tester_tier,
+              googleId: user.id,
+              joinedDate: profile.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+              enrolledAppIds: profile.enrolled_app_ids || [],
+              reputationScore: profile.reputation_score || 500,
+              bio: profile.bio || '',
+              website: profile.website || '',
+              contactEmail: profile.contact_email || user.email || '',
+              googlePlayConsoleDevId: profile.google_play_console_dev_id || '',
+              company: profile.company || '',
+              verifiedDeveloper: profile.verified_developer ?? true,
+              deviceInfo: profile.device_info || {
+                model: 'Google Pixel 8 Pro',
+                osVersion: 'Android 14',
+                manufacturer: 'Google'
               }
-              return [data, ...prev];
-            });
+            };
+            setCurrentUser(mappedUser);
           } else {
-            // First time login - bootstrap persistent profile
-            const newDevProfile: User = {
-              id: fbUser.uid,
-              firebaseUid: fbUser.uid,
-              name: fbUser.displayName || 'Android Developer',
-              developerAccountName: fbUser.displayName ? `${fbUser.displayName} Studios` : 'Indie Android Dev',
-              email: fbUser.email || 'developer@android.google.com',
-              avatar: fbUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fbUser.uid)}`,
+            // Create initial profile in Supabase
+            const newProfile: User = {
+              id: user.id,
+              name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Android Developer',
+              developerAccountName: `${user.user_metadata?.full_name || 'Indie'} Studios`,
+              email: user.email || '',
+              avatar: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.id)}`,
               role: 'developer',
               testerTier: 'tier_2_verified',
-              googleId: fbUser.uid,
+              googleId: user.id,
               joinedDate: new Date().toISOString().split('T')[0],
               enrolledAppIds: [],
               reputationScore: 500,
               bio: 'Android software developer building for Google Play closed testing tracks.',
               website: '',
-              contactEmail: fbUser.email || '',
+              contactEmail: user.email || '',
               googlePlayConsoleDevId: '',
               company: '',
               verifiedDeveloper: true,
               deviceInfo: {
                 model: 'Google Pixel 8 Pro',
-                osVersion: 'Android 14 (API 34)',
+                osVersion: 'Android 14',
                 manufacturer: 'Google'
               }
             };
 
-            await setDoc(userDocRef, {
-              ...newDevProfile,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+            await supabase.from('profiles').upsert({
+              id: newProfile.id,
+              name: newProfile.name,
+              developer_account_name: newProfile.developerAccountName,
+              email: newProfile.email,
+              avatar: newProfile.avatar,
+              role: newProfile.role,
+              tester_tier: newProfile.testerTier,
+              reputation_score: newProfile.reputationScore,
+              bio: newProfile.bio,
+              website: newProfile.website,
+              contact_email: newProfile.contactEmail,
+              google_play_console_dev_id: newProfile.googlePlayConsoleDevId,
+              company: newProfile.company,
+              verified_developer: newProfile.verifiedDeveloper,
+              device_info: newProfile.deviceInfo,
+              enrolled_app_ids: newProfile.enrolledAppIds
             });
 
-            setCurrentUser(newDevProfile);
-            setAllUsers(prev => [newDevProfile, ...prev.filter(u => u.id !== newDevProfile.id)]);
+            setCurrentUser(newProfile);
           }
-        } catch (err) {
-          console.warn('Could not sync Firestore profile:', err);
         }
+      } catch (err) {
+        console.warn('Supabase session load error (using cached state):', err);
+      } finally {
+        setIsSupabaseLoading(false);
       }
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSupabaseUser(session?.user ?? null);
     });
 
-    return () => unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Persist state updates to localStorage as robust offline cache
+  // Fetch initial data from Supabase if connected
   useEffect(() => {
+    const fetchRemoteData = async () => {
+      try {
+        const { data: remoteApps } = await supabase.from('apps').select('*');
+        if (remoteApps && remoteApps.length > 0) {
+          const mappedApps: AppListing[] = remoteApps.map((a: any) => ({
+            id: a.id,
+            developerId: a.developer_id,
+            developerName: a.developer_name,
+            developerAvatar: a.developer_avatar,
+            name: a.name,
+            packageName: a.package_name,
+            versionName: a.version_name,
+            versionCode: a.version_code,
+            icon: a.icon,
+            category: a.category,
+            shortDescription: a.short_description,
+            fullDescription: a.full_description,
+            testingTrackUrl: a.testing_track_url,
+            googleGroupUrl: a.google_group_url,
+            requiredTier: a.required_tier,
+            targetTesters: a.target_testers,
+            currentTesters: a.current_testers,
+            testStartDate: a.test_start_date,
+            testDurationDays: a.test_duration_days,
+            status: a.status,
+            testingFocus: a.testing_focus,
+            minAndroidVersion: a.min_android_version,
+            screenshots: a.screenshots || [],
+            createdAt: a.created_at,
+            averageRating: Number(a.average_rating) || 5.0,
+            ratingsCount: a.ratings_count || 0
+          }));
+          setApps(mappedApps);
+        }
+
+        const { data: remoteBugs } = await supabase.from('bug_reports').select('*').order('created_at', { ascending: false });
+        if (remoteBugs && remoteBugs.length > 0) {
+          const mappedBugs: BugReport[] = remoteBugs.map((b: any) => ({
+            id: b.id,
+            appId: b.app_id,
+            appName: b.app_name,
+            testerId: b.tester_id,
+            testerName: b.tester_name,
+            testerAvatar: b.tester_avatar,
+            title: b.title,
+            description: b.description,
+            stepsToReproduce: b.steps_to_reproduce,
+            expectedResult: b.expected_result,
+            actualResult: b.actual_result,
+            severity: b.severity,
+            status: b.status,
+            deviceModel: b.device_model,
+            osVersion: b.os_version,
+            appVersion: b.app_version,
+            screenshotUrl: b.screenshot_url,
+            developerNotes: b.developer_notes,
+            createdAt: b.created_at
+          }));
+          setBugReports(mappedBugs);
+        }
+      } catch (err) {
+        console.warn('Could not sync with Supabase tables, running offline mock cache:', err);
+      }
+    };
+
+    fetchRemoteData();
+  }, []);
+
+  // Save state to localStorage for offline cache
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_users`, JSON.stringify(allUsers));
-  }, [allUsers]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_apps`, JSON.stringify(apps));
-  }, [apps]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_bugs`, JSON.stringify(bugReports));
-  }, [bugReports]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_features`, JSON.stringify(featureFeedbacks));
-  }, [featureFeedbacks]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_comments`, JSON.stringify(comments));
-  }, [comments]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_auto_feedbacks`, JSON.stringify(automatedFeedbacks));
-  }, [automatedFeedbacks]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_enrollments`, JSON.stringify(enrollments));
-  }, [enrollments]);
+  }, [currentUser, allUsers, apps, bugReports, featureFeedbacks, comments, automatedFeedbacks, enrollments]);
 
-  // Sign in with real Firebase Google Auth
-  const signInWithFirebaseGoogle = async (): Promise<User | null> => {
+  // Upload file to Supabase Storage
+  const uploadFileToStorage = async (bucket: 'app-icons' | 'bug-screenshots', file: File): Promise<string | null> => {
     try {
-      const result = await signInWithPopup(auth, googleAuthProvider);
-      const fbUser = result.user;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-      const userDocRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userDocRef);
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file);
 
-      let resolvedUser: User;
-      if (userSnap.exists()) {
-        resolvedUser = userSnap.data() as User;
-      } else {
-        resolvedUser = {
-          id: fbUser.uid,
-          firebaseUid: fbUser.uid,
-          name: fbUser.displayName || 'Android Developer',
-          developerAccountName: fbUser.displayName ? `${fbUser.displayName} Studios` : 'Indie Android Dev',
-          email: fbUser.email || '',
-          avatar: fbUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fbUser.uid)}`,
-          role: 'developer',
-          testerTier: 'tier_2_verified',
-          googleId: fbUser.uid,
-          joinedDate: new Date().toISOString().split('T')[0],
-          enrolledAppIds: [],
-          reputationScore: 500,
-          bio: 'Android software developer building for Google Play closed testing tracks.',
-          website: '',
-          contactEmail: fbUser.email || '',
-          googlePlayConsoleDevId: '',
-          company: '',
-          verifiedDeveloper: true,
-          deviceInfo: {
-            model: 'Google Pixel 8 Pro',
-            osVersion: 'Android 14 (API 34)',
-            manufacturer: 'Google'
-          }
-        };
-
-        await setDoc(userDocRef, {
-          ...resolvedUser,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+      if (uploadError) {
+        console.warn('Storage upload error:', uploadError);
+        // Fallback to data URL for local display
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
         });
       }
 
-      setCurrentUser(resolvedUser);
-      setAllUsers(prev => [resolvedUser, ...prev.filter(u => u.id !== resolvedUser.id)]);
-      return resolvedUser;
-    } catch (err: any) {
-      console.error('Firebase Google Sign-in error:', err);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (err) {
+      console.warn('Storage upload catch error:', err);
+      return null;
+    }
+  };
+
+  const signInWithSupabaseGoogle = async () => {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+        },
+      });
+    } catch (err) {
+      console.error('Supabase Google Sign-In error:', err);
       throw err;
     }
   };
 
-  // Sign out
-  const signOutFromFirebase = async () => {
+  const signOutFromSupabase = async () => {
     try {
-      await firebaseSignOut(auth);
-      setFirebaseUser(null);
+      await supabase.auth.signOut();
+      setSupabaseUser(null);
     } catch (err) {
-      console.error('Firebase sign out error:', err);
+      console.error('Supabase sign out error:', err);
     }
   };
 
-  // Update Developer Profile and persist to Firestore
   const updateDeveloperProfile = async (profileData: Partial<User>) => {
     const updated: User = {
       ...currentUser,
@@ -334,7 +403,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(updated);
     setAllUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
 
-    // Also update any app listings where this user is the developer
     if (profileData.developerAccountName || profileData.name || profileData.avatar) {
       const devName = profileData.developerAccountName || profileData.name || updated.developerAccountName || updated.name;
       setApps(prev => prev.map(a => {
@@ -349,16 +417,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Persist to Cloud Firestore
     try {
-      const targetUid = currentUser.firebaseUid || currentUser.id;
-      const userDocRef = doc(db, 'users', targetUid);
-      await setDoc(userDocRef, {
-        ...updated,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      await supabase.from('profiles').upsert({
+        id: currentUser.id,
+        name: updated.name,
+        developer_account_name: updated.developerAccountName,
+        email: updated.email,
+        avatar: updated.avatar,
+        role: updated.role,
+        tester_tier: updated.testerTier,
+        reputation_score: updated.reputationScore,
+        bio: updated.bio,
+        website: updated.website,
+        contact_email: updated.contactEmail,
+        google_play_console_dev_id: updated.googlePlayConsoleDevId,
+        company: updated.company,
+        verified_developer: updated.verifiedDeveloper,
+        device_info: updated.deviceInfo,
+        enrolled_app_ids: updated.enrolledAppIds,
+        updated_at: new Date().toISOString()
+      });
     } catch (err) {
-      console.warn('Firestore write warning:', err);
+      console.warn('Supabase profile update warning:', err);
     }
   };
 
@@ -414,17 +494,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAllUsers(prev => [...prev, newUser]);
       setCurrentUser(newUser);
 
-      // Attempt background Firestore sync
-      try {
-        const userDocRef = doc(db, 'users', newUser.id);
-        setDoc(userDocRef, {
-          ...newUser,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        // Safe to ignore if offline
-      }
+      // Save to Supabase
+      supabase.from('profiles').upsert({
+        id: newUser.id,
+        name: newUser.name,
+        developer_account_name: newUser.developerAccountName,
+        email: newUser.email,
+        avatar: newUser.avatar,
+        role: newUser.role,
+        tester_tier: newUser.testerTier,
+        reputation_score: newUser.reputationScore,
+        bio: newUser.bio,
+        contact_email: newUser.contactEmail,
+        verified_developer: newUser.verifiedDeveloper,
+        device_info: newUser.deviceInfo
+      }).then();
     }
   };
 
@@ -436,7 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateDeveloperProfile({ testerTier });
   };
 
-  const publishApp = (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>): AppListing => {
+  const publishApp = async (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>): Promise<AppListing> => {
     const newApp: AppListing = {
       ...appData,
       id: `app_${Date.now()}`,
@@ -452,18 +536,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setApps(prev => [newApp, ...prev]);
 
-    // Persist app to Firestore
     try {
-      const appDocRef = doc(db, 'apps', newApp.id);
-      setDoc(appDocRef, newApp);
+      await supabase.from('apps').insert({
+        id: newApp.id,
+        developer_id: newApp.developerId,
+        developer_name: newApp.developerName,
+        developer_avatar: newApp.developerAvatar,
+        name: newApp.name,
+        package_name: newApp.packageName,
+        version_name: newApp.versionName,
+        version_code: newApp.versionCode,
+        icon: newApp.icon,
+        category: newApp.category,
+        short_description: newApp.shortDescription,
+        full_description: newApp.fullDescription,
+        testing_track_url: newApp.testingTrackUrl,
+        google_group_url: newApp.googleGroupUrl,
+        required_tier: newApp.requiredTier,
+        target_testers: newApp.targetTesters,
+        current_testers: 0,
+        test_start_date: newApp.testStartDate,
+        test_duration_days: newApp.testDurationDays,
+        status: newApp.status,
+        testing_focus: newApp.testingFocus,
+        min_android_version: newApp.minAndroidVersion,
+        screenshots: newApp.screenshots
+      });
     } catch (e) {
-      console.warn('Firestore app write:', e);
+      console.warn('Supabase app insert warning:', e);
     }
 
     return newApp;
   };
 
-  const enrollInApp = (appId: string, deviceModel: string, osVersion: string) => {
+  const enrollInApp = async (appId: string, deviceModel: string, osVersion: string) => {
     const app = apps.find(a => a.id === appId);
     if (!app) return;
 
@@ -487,7 +593,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setEnrollments(prev => [newEnrollment, ...prev]);
 
-    // Update app currentTesters count
     setApps(prev => prev.map(a => {
       if (a.id === appId) {
         const nextCount = a.currentTesters + 1;
@@ -500,15 +605,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return a;
     }));
 
-    // Update current user enrolledAppIds
     const updatedEnrolled = [...(currentUser.enrolledAppIds || []), appId];
     updateDeveloperProfile({
       enrolledAppIds: updatedEnrolled,
       reputationScore: (currentUser.reputationScore || 0) + 20
     });
+
+    try {
+      await supabase.from('enrollments').insert({
+        id: newEnrollment.id,
+        app_id: newEnrollment.appId,
+        tester_id: newEnrollment.testerId,
+        tester_name: newEnrollment.testerName,
+        tester_avatar: newEnrollment.testerAvatar,
+        tester_email: newEnrollment.testerEmail,
+        tester_tier: newEnrollment.testerTier,
+        device_model: newEnrollment.deviceModel,
+        os_version: newEnrollment.osVersion,
+        days_active: newEnrollment.daysActive,
+        daily_checkins: newEnrollment.dailyCheckins
+      });
+    } catch (e) {
+      console.warn('Supabase enrollment insert warning:', e);
+    }
   };
 
-  const unenrollFromApp = (appId: string) => {
+  const unenrollFromApp = async (appId: string) => {
     setEnrollments(prev => prev.filter(e => !(e.appId === appId && e.testerId === currentUser.id)));
     setApps(prev => prev.map(a => {
       if (a.id === appId && a.currentTesters > 0) {
@@ -519,9 +641,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateDeveloperProfile({
       enrolledAppIds: (currentUser.enrolledAppIds || []).filter(id => id !== appId)
     });
+
+    try {
+      await supabase.from('enrollments').delete().match({ app_id: appId, tester_id: currentUser.id });
+    } catch (e) {
+      console.warn('Supabase enrollment delete warning:', e);
+    }
   };
 
-  const performDailyCheckin = (appId: string): boolean => {
+  const performDailyCheckin = async (appId: string): Promise<boolean> => {
     const today = new Date().toISOString().split('T')[0];
     let updated = false;
 
@@ -549,7 +677,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return updated;
   };
 
-  const reportBug = (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>): BugReport => {
+  const reportBug = async (bugData: Omit<BugReport, 'id' | 'testerId' | 'testerName' | 'testerAvatar' | 'createdAt' | 'status'>): Promise<BugReport> => {
     const newBug: BugReport = {
       ...bugData,
       id: `bug_${Date.now()}`,
@@ -562,15 +690,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setBugReports(prev => [newBug, ...prev]);
 
-    // Persist to Firestore
     try {
-      const bugDocRef = doc(db, 'bugReports', newBug.id);
-      setDoc(bugDocRef, newBug);
+      await supabase.from('bug_reports').insert({
+        id: newBug.id,
+        app_id: newBug.appId,
+        app_name: newBug.appName,
+        tester_id: newBug.testerId,
+        tester_name: newBug.testerName,
+        tester_avatar: newBug.testerAvatar,
+        title: newBug.title,
+        description: newBug.description,
+        steps_to_reproduce: newBug.stepsToReproduce,
+        expected_result: newBug.expectedResult,
+        actual_result: newBug.actualResult,
+        severity: newBug.severity,
+        status: newBug.status,
+        device_model: newBug.deviceModel,
+        os_version: newBug.osVersion,
+        app_version: newBug.appVersion,
+        screenshot_url: newBug.screenshotUrl
+      });
     } catch (e) {
-      console.warn('Firestore bug write:', e);
+      console.warn('Supabase bug insert warning:', e);
     }
 
-    // Award reputation points
     updateDeveloperProfile({
       reputationScore: (currentUser.reputationScore || 0) + 30
     });
@@ -578,7 +721,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBug;
   };
 
-  const updateBugStatus = (bugId: string, status: BugStatus, notes?: string) => {
+  const updateBugStatus = async (bugId: string, status: BugStatus, notes?: string) => {
     setBugReports(prev => prev.map(bug => {
       if (bug.id === bugId) {
         return {
@@ -590,16 +733,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return bug;
     }));
 
-    // Update in Firestore
     try {
-      const bugDocRef = doc(db, 'bugReports', bugId);
-      setDoc(bugDocRef, { status, developerNotes: notes }, { merge: true });
+      await supabase.from('bug_reports').update({
+        status,
+        developer_notes: notes
+      }).eq('id', bugId);
     } catch (e) {
-      console.warn('Firestore update bug:', e);
+      console.warn('Supabase update bug warning:', e);
     }
   };
 
-  const submitAutomatedFeedback = (feedback: Omit<AutomatedFeedbackSubmission, 'id' | 'testerId' | 'testerName' | 'testerTier' | 'submittedAt'>): AutomatedFeedbackSubmission => {
+  const submitAutomatedFeedback = async (feedback: Omit<AutomatedFeedbackSubmission, 'id' | 'testerId' | 'testerName' | 'testerTier' | 'submittedAt'>): Promise<AutomatedFeedbackSubmission> => {
     const newSubmission: AutomatedFeedbackSubmission = {
       ...feedback,
       id: `fb_${Date.now()}`,
@@ -611,7 +755,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAutomatedFeedbacks(prev => [newSubmission, ...prev]);
 
-    // Update enrollment completedFeedbacks
     setEnrollments(prev => prev.map(e => {
       if (e.appId === feedback.appId && e.testerId === currentUser.id) {
         if (!e.completedFeedbacks.includes(feedback.phase)) {
@@ -624,15 +767,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return e;
     }));
 
-    // Persist to Firestore
     try {
-      const fbDocRef = doc(db, 'automatedFeedbacks', newSubmission.id);
-      setDoc(fbDocRef, newSubmission);
+      await supabase.from('automated_feedbacks').insert({
+        id: newSubmission.id,
+        app_id: newSubmission.appId,
+        app_name: newSubmission.appName,
+        tester_id: newSubmission.testerId,
+        tester_name: newSubmission.testerName,
+        tester_tier: newSubmission.testerTier,
+        phase: newSubmission.phase,
+        stability_rating: newSubmission.stabilityRating,
+        battery_impact_rating: newSubmission.batteryImpactRating,
+        ui_intuitiveness_rating: newSubmission.uiIntuitivenessRating,
+        crash_encountered: newSubmission.crashEncountered,
+        crash_details: newSubmission.crashDetails,
+        favorite_features: newSubmission.favoriteFeatures,
+        confusing_areas: newSubmission.confusingAreas,
+        net_promoter_score: newSubmission.netPromoterScore,
+        device_model: newSubmission.deviceModel
+      });
     } catch (e) {
-      console.warn('Firestore feedback write:', e);
+      console.warn('Supabase feedback insert warning:', e);
     }
 
-    // Award reputation
     updateDeveloperProfile({
       reputationScore: (currentUser.reputationScore || 0) + 40
     });
@@ -640,7 +797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newSubmission;
   };
 
-  const createFeatureFeedback = (data: Omit<FeatureFeedbackItem, 'id' | 'authorId' | 'authorName' | 'authorAvatar' | 'authorRole' | 'likes' | 'likedBy' | 'commentsCount' | 'createdAt'>): FeatureFeedbackItem => {
+  const createFeatureFeedback = async (data: Omit<FeatureFeedbackItem, 'id' | 'authorId' | 'authorName' | 'authorAvatar' | 'authorRole' | 'likes' | 'likedBy' | 'commentsCount' | 'createdAt'>): Promise<FeatureFeedbackItem> => {
     const newItem: FeatureFeedbackItem = {
       ...data,
       id: `feat_${Date.now()}`,
@@ -656,12 +813,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setFeatureFeedbacks(prev => [newItem, ...prev]);
 
-    // Persist to Firestore
     try {
-      const featDocRef = doc(db, 'featureFeedbacks', newItem.id);
-      setDoc(featDocRef, newItem);
+      await supabase.from('feature_feedbacks').insert({
+        id: newItem.id,
+        app_id: newItem.appId,
+        app_name: newItem.appName,
+        author_id: newItem.authorId,
+        author_name: newItem.authorName,
+        author_avatar: newItem.authorAvatar,
+        author_role: newItem.authorRole,
+        title: newItem.title,
+        description: newItem.description,
+        category: newItem.category,
+        status: newItem.status,
+        likes: newItem.likes,
+        liked_by: newItem.likedBy,
+        tags: newItem.tags
+      });
     } catch (e) {
-      console.warn('Firestore feature write:', e);
+      console.warn('Supabase feature insert warning:', e);
     }
 
     return newItem;
@@ -693,7 +863,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const addComment = (feedbackId: string, content: string): FeedbackComment => {
+  const addComment = async (feedbackId: string, content: string): Promise<FeedbackComment> => {
     const newComment: FeedbackComment = {
       id: `comm_${Date.now()}`,
       feedbackId,
@@ -715,6 +885,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return item;
     }));
+
+    try {
+      await supabase.from('feedback_comments').insert({
+        id: newComment.id,
+        feedback_id: newComment.feedbackId,
+        author_id: newComment.authorId,
+        author_name: newComment.authorName,
+        author_avatar: newComment.authorAvatar,
+        author_role: newComment.authorRole,
+        content: newComment.content
+      });
+    } catch (e) {
+      console.warn('Supabase comment insert warning:', e);
+    }
 
     return newComment;
   };
@@ -744,7 +928,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFeatureFeedbacks(INITIAL_FEATURE_FEEDBACK);
     setComments(INITIAL_COMMENTS);
     setAutomatedFeedbacks(INITIAL_AUTOMATED_FEEDBACKS);
-    localStorage.clear();
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+    }
   };
 
   const resetToSampleData = () => {
@@ -761,13 +947,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       comments,
       automatedFeedbacks,
       enrollments,
-      firebaseUser,
-      isFirebaseLoading,
+      supabaseUser,
+      isSupabaseLoading,
       setCurrentUser,
       switchUser,
       loginWithGoogle,
-      signInWithFirebaseGoogle,
-      signOutFromFirebase,
+      signInWithSupabaseGoogle,
+      signOutFromSupabase,
+      uploadFileToStorage,
       updateDeveloperProfile,
       updateUserRole,
       updateTesterTier,

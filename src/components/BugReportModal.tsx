@@ -40,7 +40,7 @@ export const BugReportModal: React.FC<BugReportModalProps> = ({
   onClose,
   defaultApp
 }) => {
-  const { apps, currentUser, reportBug } = useApp();
+  const { apps, currentUser, reportBug, uploadFileToStorage } = useApp();
 
   const [selectedAppId, setSelectedAppId] = useState(defaultApp?.id || apps[0]?.id || '');
   const [title, setTitle] = useState('');
@@ -52,6 +52,7 @@ export const BugReportModal: React.FC<BugReportModalProps> = ({
   const [deviceModel, setDeviceModel] = useState(currentUser.deviceInfo?.model || 'Google Pixel 8 Pro');
   const [osVersion, setOsVersion] = useState(currentUser.deviceInfo?.osVersion || 'Android 14 (API 34)');
   const [screenshotUrl, setScreenshotUrl] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,15 +61,17 @@ export const BugReportModal: React.FC<BugReportModalProps> = ({
 
   const currentApp = apps.find(a => a.id === selectedAppId) || defaultApp || apps[0];
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setScreenshotUrl(e.target.result as string);
+    setIsUploadingImage(true);
+    try {
+      const publicUrl = await uploadFileToStorage('bug-screenshots', file);
+      if (publicUrl) {
+        setScreenshotUrl(publicUrl);
       }
-    };
-    reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {

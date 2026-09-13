@@ -166,3 +166,17 @@ export interface FeatureFeedbackItem {
   createdAt: string;
   tags: string[];
 }
+
+export const slugify = (text?: string | null): string => {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/&/g, '-and-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+};

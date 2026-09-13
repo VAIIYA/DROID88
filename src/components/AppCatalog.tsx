@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { AppListing, AppCategory, TesterTier } from '../types';
+import { AppListing, AppCategory, TesterTier, slugify } from '../types';
 import { 
   Search, 
   Filter, 
@@ -332,7 +332,9 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onSelectDeveloper) onSelectDeveloper(app.developerId);
+                      if (onSelectDeveloper) {
+                        onSelectDeveloper(app.developerName ? slugify(app.developerName) : app.developerId);
+                      }
                     }}
                     className="flex items-center gap-1.5 hover:text-emerald-700 transition group/dev text-left cursor-pointer"
                     title="View Developer Profile"

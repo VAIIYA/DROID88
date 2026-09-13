@@ -14,7 +14,7 @@ import { PublishAppModal } from '@/components/PublishAppModal';
 import { BugReportModal } from '@/components/BugReportModal';
 import { AutomatedFeedbackModal } from '@/components/AutomatedFeedbackModal';
 import { AppDetailPage } from '@/components/AppDetailPage';
-import { AppListing } from '@/types';
+import { AppListing, slugify } from '@/types';
 
 export type AppTab = 'catalog' | 'tester_hub' | 'dev_dashboard' | 'dev_profile' | 'community' | 'analytics' | 'app_detail';
 
@@ -29,7 +29,7 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
   initialDeveloperId = null,
   initialAppId = null
 }) => {
-  const { apps, resetToSampleData } = useApp();
+  const { apps, currentUser, resetToSampleData } = useApp();
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<AppTab>(initialTab);
@@ -111,11 +111,18 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
     setIsFeedbackModalOpen(true);
   };
 
-  const handleOpenDeveloperProfile = (developerId: string) => {
-    setTargetDeveloperId(developerId);
+  const handleOpenDeveloperProfile = (developerIdentifier: string) => {
+    const matchingApp = apps.find(a => 
+      a.developerId.toLowerCase() === developerIdentifier.toLowerCase() || 
+      slugify(a.developerName) === slugify(developerIdentifier)
+    );
+    const slug = matchingApp?.developerName ? slugify(matchingApp.developerName) : slugify(developerIdentifier);
+    const target = slug || developerIdentifier;
+
+    setTargetDeveloperId(target);
     setActiveTab('dev_profile');
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', `/profile/${developerId}`);
+      window.history.pushState({}, '', `/profile/${target}`);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -130,10 +137,15 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
   };
 
   const handleOpenOwnProfile = () => {
-    setTargetDeveloperId(null);
+    const ownSlug = currentUser?.developerAccountName 
+      ? slugify(currentUser.developerAccountName) 
+      : (currentUser ? slugify(currentUser.name || currentUser.id) : null);
+
+    setTargetDeveloperId(ownSlug || null);
     setActiveTab('dev_profile');
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', '/profile');
+      const url = ownSlug ? `/profile/${ownSlug}` : '/profile';
+      window.history.pushState({}, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -144,8 +156,12 @@ export const Droid88Hub: React.FC<Droid88HubProps> = ({
       if (tab === 'catalog') {
         window.history.pushState({}, '', '/');
       } else if (tab === 'dev_profile') {
-        if (targetDeveloperId) {
-          window.history.pushState({}, '', `/profile/${targetDeveloperId}`);
+        const ownSlug = currentUser?.developerAccountName 
+          ? slugify(currentUser.developerAccountName) 
+          : (currentUser ? slugify(currentUser.name || currentUser.id) : null);
+        const target = targetDeveloperId || ownSlug;
+        if (target) {
+          window.history.pushState({}, '', `/profile/${target}`);
         } else {
           window.history.pushState({}, '', '/profile');
         }

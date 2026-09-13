@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, AppListing } from '../types';
+import { User, AppListing, slugify } from '../types';
 import { 
   Building2, 
   Globe, 
@@ -52,12 +52,82 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
     supabaseUser 
   } = useApp();
 
-  // Determine which developer profile we are looking at
-  const profileUser: User | null = targetDeveloperId 
-    ? allUsers.find(u => u.id === targetDeveloperId) || (currentUser || null)
-    : (currentUser || null);
+  // Determine which developer profile we are looking at with robust ID, slug, and app matching
+  const profileUser: User | null = (() => {
+    if (!targetDeveloperId) {
+      return currentUser || allUsers[0] || null;
+    }
+
+    const cleanTarget = targetDeveloperId.trim().toLowerCase();
+
+    // 1. Direct ID match
+    const byId = allUsers.find(u => u.id.toLowerCase() === cleanTarget);
+    if (byId) return byId;
+
+    // 2. Slug match on developerAccountName or name
+    const bySlug = allUsers.find(u => 
+      (u.developerAccountName && slugify(u.developerAccountName) === cleanTarget) ||
+      slugify(u.name) === cleanTarget
+    );
+    if (bySlug) return bySlug;
+
+    // 3. Match against currentUser
+    if (currentUser) {
+      if (
+        currentUser.id.toLowerCase() === cleanTarget ||
+        (currentUser.developerAccountName && slugify(currentUser.developerAccountName) === cleanTarget) ||
+        slugify(currentUser.name) === cleanTarget ||
+        (currentUser.email && currentUser.email.toLowerCase() === cleanTarget)
+      ) {
+        return currentUser;
+      }
+    }
+
+    // 4. Match against apps published by this developer
+    const matchingApp = apps.find(a => 
+      a.developerId.toLowerCase() === cleanTarget ||
+      slugify(a.developerName) === cleanTarget ||
+      a.developerName.toLowerCase() === cleanTarget
+    );
+    if (matchingApp) {
+      const devInUsers = allUsers.find(u => u.id.toLowerCase() === matchingApp.developerId.toLowerCase());
+      if (devInUsers) return devInUsers;
+
+      return {
+        id: matchingApp.developerId,
+        name: matchingApp.developerName,
+        developerAccountName: matchingApp.developerName,
+        email: '',
+        avatar: matchingApp.developerAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(matchingApp.developerId)}`,
+        role: 'developer',
+        testerTier: 'tier_2_verified',
+        googleId: matchingApp.developerId,
+        joinedDate: matchingApp.createdAt ? matchingApp.createdAt.split('T')[0] : '2026-01-01',
+        enrolledAppIds: [matchingApp.id],
+        reputationScore: 500,
+        bio: `Android developer of ${matchingApp.name} on Droid88.`,
+        verifiedDeveloper: true
+      };
+    }
+
+    return null;
+  })();
 
   const isOwnProfile = currentUser && profileUser ? profileUser.id === currentUser.id : false;
+
+  const developerSlug = profileUser 
+    ? (profileUser.developerAccountName ? slugify(profileUser.developerAccountName) : slugify(profileUser.name || profileUser.id))
+    : '';
+
+  // Synchronize the browser URL to display the unique matching developer URL
+  useEffect(() => {
+    if (typeof window !== 'undefined' && developerSlug) {
+      const path = window.location.pathname;
+      if (path === '/profile' || path === '/profile/' || (path.startsWith('/profile/') && path !== `/profile/${developerSlug}`)) {
+        window.history.replaceState({}, '', `/profile/${developerSlug}`);
+      }
+    }
+  }, [developerSlug]);
 
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -69,8 +139,8 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
   const handleShareProfile = async () => {
     if (!profileUser) return;
     const url = typeof window !== 'undefined'
-      ? `${window.location.origin}/profile/${profileUser.id}`
-      : `https://droid88.vercel.app/profile/${profileUser.id}`;
+      ? `${window.location.origin}/profile/${developerSlug || profileUser.id}`
+      : `https://droid88.vercel.app/profile/${developerSlug || profileUser.id}`;
     try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(url);
@@ -112,6 +182,33 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
   ) : [];
 
   const totalTestersRecruited = developerApps.reduce((sum, a) => sum + a.currentTesters, 0);
+
+  // If targetDeveloperId was specified and developer was not found
+  if (!profileUser && targetDeveloperId) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-600 shadow-sm">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-display font-bold text-2xl text-slate-900">Developer Profile Not Found</h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+              We couldn&apos;t find a developer studio matching &ldquo;{targetDeveloperId}&rdquo;.
+            </p>
+          </div>
+          {onBackToCatalog && (
+            <button
+              onClick={onBackToCatalog}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
+            >
+              <span>Back to App Catalog</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // If unauthenticated and trying to view own profile
   if (!profileUser) {
@@ -210,50 +307,61 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
 
       {/* Main Developer Identity Profile Header */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Cover Canvas Gradient */}
-        <div className="h-44 sm:h-52 bg-gradient-to-r from-slate-900 via-indigo-950 to-emerald-950 relative p-6 flex items-end justify-between">
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            {/* Supabase Cloud Profile Pill */}
-            <span className="bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] px-3 py-1 rounded-full flex items-center gap-1.5 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Supabase Cloud Profile</span>
-            </span>
-
-            {profileUser.verifiedDeveloper && (
-              <span className="bg-emerald-500/30 backdrop-blur-md border border-emerald-400/50 text-emerald-300 text-[11px] px-3 py-1 rounded-full flex items-center gap-1 font-bold">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Verified Android Developer</span>
+        {/* Profile Details Header */}
+        <div className="p-6 sm:p-8 bg-gradient-to-b from-slate-50/80 via-white to-white border-b border-slate-100">
+          {/* Top Status & Verification Badges Row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-500 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/80 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-slate-400" />
+                <span>droid88.vercel.app/profile/{developerSlug}</span>
               </span>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Profile Details Container */}
-        <div className="px-6 sm:px-8 pb-8 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 -mt-16 sm:-mt-20 mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Supabase Cloud Profile Pill */}
+              <span className="bg-white border border-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 font-medium shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Supabase Cloud Profile</span>
+              </span>
+
+              {profileUser.verifiedDeveloper && (
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold shadow-2xs">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Verified Android Developer</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="relative shrink-0">
                 <img
                   src={profileUser.avatar}
                   alt={profileUser.name}
-                  className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl object-cover border-4 border-white shadow-xl bg-slate-100"
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-2 border-slate-200 shadow-md bg-white"
                 />
-                <span className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white" title="Active">
+                <span className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white shadow-xs" title="Active">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 </span>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-900">
+                  <h1 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight">
                     {profileUser.developerAccountName || `${profileUser.name} Studios`}
                   </h1>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                   <span className="font-semibold text-slate-700">Account Owner: {profileUser.name}</span>
-                  <span>•</span>
-                  <span className="font-mono text-slate-500">{profileUser.email}</span>
+                  {profileUser.email && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono text-slate-500">{profileUser.email}</span>
+                    </>
+                  )}
                   <span>•</span>
                   <span className="text-emerald-700 font-bold capitalize">Role: {profileUser.role}</span>
                 </div>
@@ -261,11 +369,11 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
             </div>
 
             {/* Profile Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
               <button
                 onClick={handleShareProfile}
-                className="px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-                title="Copy direct shareable profile URL"
+                className="px-4 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                title="Copy unique profile link"
               >
                 {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-slate-500" />}
                 <span>{isCopied ? 'Link Copied!' : 'Share Profile'}</span>
@@ -275,7 +383,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
                 <>
                   <button
                     onClick={() => setIsEditing(!isEditing)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
                       isEditing 
                         ? 'bg-slate-200 text-slate-800 hover:bg-slate-300' 
                         : 'bg-slate-900 hover:bg-slate-800 text-white'
@@ -287,7 +395,7 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
 
                   <button
                     onClick={onOpenPublishModal}
-                    className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>+ Publish Track</span>
                   </button>
@@ -295,6 +403,10 @@ export const DeveloperProfilePage: React.FC<DeveloperProfilePageProps> = ({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Profile Details Container */}
+        <div className="p-6 sm:p-8 space-y-6">
 
           {/* Success Banner */}
           {saveSuccess && (

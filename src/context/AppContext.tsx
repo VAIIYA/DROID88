@@ -259,6 +259,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const fetchRemoteData = async () => {
       try {
+        const { data: remoteProfiles } = await supabase.from('profiles').select('*');
+        if (remoteProfiles && remoteProfiles.length > 0) {
+          const mappedUsers: User[] = remoteProfiles.map((p: any) => ({
+            id: p.id,
+            name: p.name || 'Developer',
+            developerAccountName: p.developer_account_name || `${p.name || 'Developer'} Studios`,
+            email: p.email || '',
+            avatar: p.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(p.id)}`,
+            role: p.role || 'developer',
+            testerTier: p.tester_tier || 'tier_2_verified',
+            googleId: p.google_id || p.id,
+            joinedDate: p.created_at ? p.created_at.split('T')[0] : '2026-01-01',
+            enrolledAppIds: p.enrolled_app_ids || [],
+            reputationScore: p.reputation_score || 500,
+            bio: p.bio || '',
+            website: p.website || '',
+            contactEmail: p.contact_email || p.email || '',
+            googlePlayConsoleDevId: p.google_play_console_dev_id || '',
+            company: p.company || '',
+            verifiedDeveloper: p.verified_developer ?? true,
+            deviceInfo: p.device_info || {
+              model: 'Google Pixel 8 Pro',
+              osVersion: 'Android 14 (API 34)',
+              manufacturer: 'Google'
+            }
+          }));
+
+          setAllUsers(prev => {
+            const map = new Map<string, User>();
+            prev.forEach(u => map.set(u.id, u));
+            mappedUsers.forEach(u => map.set(u.id, u));
+            return Array.from(map.values());
+          });
+        }
+
         const { data: remoteApps } = await supabase.from('apps').select('*');
         if (remoteApps && remoteApps.length > 0) {
           const mappedApps: AppListing[] = remoteApps.map((a: any) => ({

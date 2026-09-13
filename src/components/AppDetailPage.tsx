@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
-import { AppListing } from '@/types';
+import { AppListing, slugify } from '@/types';
 import { 
   Smartphone, 
   Users, 
@@ -296,7 +296,7 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
                   <span>Published by</span>
                   <button
                     type="button"
-                    onClick={() => onSelectDeveloper && onSelectDeveloper(app.developerId)}
+                    onClick={() => onSelectDeveloper && onSelectDeveloper(app.developerName ? slugify(app.developerName) : app.developerId)}
                     className="text-emerald-700 hover:text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-1"
                   >
                     <Building2 className="w-3.5 h-3.5" />

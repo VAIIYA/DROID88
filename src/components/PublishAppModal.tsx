@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AppCategory, TesterTier } from '../types';
@@ -5,12 +7,14 @@ import {
   X, 
   Sparkles, 
   Smartphone, 
-  Plus, 
   Trash2, 
-  ExternalLink, 
+  Upload,
+  Image as ImageIcon,
+  Link2,
   CheckCircle,
-  HelpCircle,
-  ShieldCheck
+  Loader2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -20,26 +24,67 @@ interface PublishAppModalProps {
   onSuccess: () => void;
 }
 
-const DEFAULT_ICONS = [
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=200&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1618172193763-c511deb635ca?w=200&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&auto=format&fit=crop&q=80'
-];
+// Helper to format package names like "com.vaiiya.matchmoji" into "Matchmoji"
+const formatPackageToName = (pkg: string): string => {
+  if (!pkg) return '';
+  const parts = pkg.split('.');
+  const lastPart = parts[parts.length - 1] || pkg;
+  
+  const words = lastPart
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .trim()
+    .split(/\s+/);
+
+  return words
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Generates an adaptive SVG app icon with an initial letter and modern gradient
+const generateAdaptiveSvgIcon = (title: string, colorIndex: number = 0): string => {
+  const initial = title ? title.trim().charAt(0).toUpperCase() : 'A';
+  
+  const gradients = [
+    { start: '#10b981', end: '#047857' }, // Emerald
+    { start: '#6366f1', end: '#4338ca' }, // Indigo
+    { start: '#f59e0b', end: '#b45309' }, // Amber
+    { start: '#ec4899', end: '#be185d' }, // Pink
+    { start: '#06b6d4', end: '#0e7490' }, // Cyan
+    { start: '#3b82f6', end: '#1d4ed8' }, // Blue
+  ];
+
+  const { start, end } = gradients[colorIndex % gradients.length];
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+    <defs>
+      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${start}"/>
+        <stop offset="100%" stop-color="${end}"/>
+      </linearGradient>
+    </defs>
+    <rect width="128" height="128" rx="30" fill="url(#grad)"/>
+    <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="68" font-weight="800" fill="#ffffff">${initial}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
 
 export const PublishAppModal: React.FC<PublishAppModalProps> = ({
   isOpen,
   onClose,
   onSuccess
 }) => {
-  const { publishApp } = useApp();
+  const { publishApp, uploadFileToStorage } = useApp();
 
   const [name, setName] = useState('');
   const [packageName, setPackageName] = useState('');
   const [versionName, setVersionName] = useState('1.0.0-rc1');
   const [versionCode, setVersionCode] = useState(1);
   const [category, setCategory] = useState<AppCategory>('Productivity');
-  const [icon, setIcon] = useState(DEFAULT_ICONS[0]);
+  const [icon, setIcon] = useState(() => generateAdaptiveSvgIcon('App', 0));
   const [shortDescription, setShortDescription] = useState('');
   const [fullDescription, setFullDescription] = useState('');
   const [testingTrackUrl, setTestingTrackUrl] = useState('');
@@ -51,8 +96,16 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
   const [testDurationDays, setTestDurationDays] = useState(14);
   const [minAndroidVersion, setMinAndroidVersion] = useState('Android 11 (API 30)+');
 
-  // Auto-detect package name and dual URLs when pasting any Play link
-  const handleUrlOrPackageChange = (val: string) => {
+  // Metadata & Icon states
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [iconUploadError, setIconUploadError] = useState<string | null>(null);
+  const [autoFillBadge, setAutoFillBadge] = useState<string | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [customUrlInput, setCustomUrlInput] = useState('');
+
+  // Auto-detect package name, auto-fill app name & icon, and dual URLs
+  const handleUrlOrPackageChange = async (val: string) => {
     setTestingTrackUrl(val);
 
     let detectedPkg = '';
@@ -65,8 +118,9 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       try {
         const u = new URL(val);
         detectedPkg = u.searchParams.get('id') || '';
-      } catch (e) {
-        // ignore
+      } catch {
+        const match = val.match(/id=([a-zA-Z0-9_.]+)/);
+        if (match) detectedPkg = match[1];
       }
     }
     // Format 3: Raw package name like com.company.app
@@ -75,12 +129,83 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
     }
 
     if (detectedPkg) {
-      if (!packageName) setPackageName(detectedPkg);
+      setPackageName(detectedPkg);
       setWebOptInUrl(`https://play.google.com/apps/testing/${detectedPkg}`);
       setAndroidOptInUrl(`https://play.google.com/store/apps/details?id=${detectedPkg}`);
+
+      // Auto-derive formatted app name from package name immediately
+      const formattedTitle = formatPackageToName(detectedPkg);
+      if (!name || name === formatPackageToName(packageName)) {
+        setName(formattedTitle);
+        // Also generate an adaptive icon using the first letter if using default SVG
+        if (icon.startsWith('data:image/svg+xml')) {
+          setIcon(generateAdaptiveSvgIcon(formattedTitle, 0));
+        }
+        setAutoFillBadge(`Auto-detected "${formattedTitle}"`);
+      }
+
+      // Fetch official Play Store metadata (if public/pre-reg/open)
+      setIsFetchingMetadata(true);
+      try {
+        const res = await fetch(`/api/play-store-metadata?id=${encodeURIComponent(detectedPkg)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.found) {
+            if (data.name) setName(data.name);
+            if (data.icon) setIcon(data.icon);
+            if (data.description && !shortDescription) setShortDescription(data.description);
+            setAutoFillBadge(`Synced details & icon from Google Play for "${data.name}"`);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not reach play-store-metadata:', err);
+      } finally {
+        setIsFetchingMetadata(false);
+      }
     }
   };
-  
+
+  // Upload custom app icon file to Supabase Storage
+  const handleIconFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setIconUploadError('Please select a valid image file (PNG, WebP, JPG, or SVG).');
+      return;
+    }
+
+    setIconUploadError(null);
+    setIsUploadingIcon(true);
+
+    try {
+      const publicUrl = await uploadFileToStorage('app-icons', file);
+      if (publicUrl) {
+        setIcon(publicUrl);
+        setAutoFillBadge('App icon uploaded successfully');
+      } else {
+        // Fallback to local Data URL
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (ev.target?.result) setIcon(ev.target.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err: any) {
+      setIconUploadError(err.message || 'Failed to upload icon.');
+    } finally {
+      setIsUploadingIcon(false);
+    }
+  };
+
+  const handleApplyCustomUrl = () => {
+    if (customUrlInput.trim()) {
+      setIcon(customUrlInput.trim());
+      setShowUrlInput(false);
+      setCustomUrlInput('');
+    }
+  };
+
   const [focusPoints, setFocusPoints] = useState<string[]>([
     'In-app billing and subscription restore testing',
     'Background sync and push notification reliability'
@@ -111,8 +236,8 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
       versionCode: Number(versionCode),
       icon,
       category,
-      shortDescription,
-      fullDescription,
+      shortDescription: shortDescription.trim() || `${name} closed testing build for Android.`,
+      fullDescription: fullDescription.trim() || `Testing goals: 20 testers for 14 continuous days. Focus on stability and usability.`,
       testingTrackUrl: testingTrackUrl.trim(),
       webOptInUrl: webOptInUrl.trim() || `https://play.google.com/apps/testing/${packageName.trim().toLowerCase()}`,
       androidOptInUrl: androidOptInUrl.trim() || `https://play.google.com/store/apps/details?id=${packageName.trim().toLowerCase()}`,
@@ -158,7 +283,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition"
+            className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -166,34 +291,50 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Track URL & Package Name */}
-          <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-950 uppercase tracking-wide">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Google Play Closed Testing Credentials</span>
+          {/* Track URL & Package Name Input Card */}
+          <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Google Play Closed Testing Link</span>
+              </div>
+              {isFetchingMetadata && (
+                <span className="text-[10px] bg-white text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />
+                  Looking up Play Store metadata...
+                </span>
+              )}
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-semibold text-slate-700">
-                  Google Play Track Opt-in or Package Name <span className="text-rose-500">*</span>
+                  Paste Google Play Track Link or Package Name <span className="text-rose-500">*</span>
                 </label>
                 <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full">
-                  Auto-Detects Web & Android Links
+                  Auto-Fills Title & Testing Links
                 </span>
               </div>
               <input
                 type="text"
                 value={testingTrackUrl}
                 onChange={(e) => handleUrlOrPackageChange(e.target.value)}
-                placeholder="Paste Play Console URL or package name (e.g. com.company.app)"
+                placeholder="e.g. https://play.google.com/store/apps/details?id=com.vaiiya.matchmoji"
                 className="w-full px-3.5 py-2.5 text-xs font-mono border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Paste either link from Play Console &gt; Closed Testing &gt; Testers ("Join on Android" or "Join on the Web"). We will generate both automatically!
+                Paste any Play Console link ("Join on Android" or "Join on the Web") or package ID. We auto-extract both links and the App Name!
               </span>
             </div>
+
+            {/* Auto-fill notification badge */}
+            {autoFillBadge && (
+              <div className="p-2.5 bg-white border border-emerald-300 rounded-xl text-xs text-emerald-900 font-medium flex items-center gap-2 animate-fadeIn">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{autoFillBadge}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -210,7 +351,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                       handleUrlOrPackageChange(pkg);
                     }
                   }}
-                  placeholder="com.example.myapp"
+                  placeholder="com.vaiiya.matchmoji"
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   required
                 />
@@ -230,11 +371,11 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
               </div>
             </div>
 
-            {/* Preview Generated Links */}
+            {/* Generated Dual Play Console Links Preview */}
             {(webOptInUrl || androidOptInUrl) && (
               <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
-                  Generated Play Console Links for Testers:
+                  Generated Play Console Opt-In Links:
                 </span>
                 <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px] truncate">
                   <span className="font-sans font-bold text-slate-800 shrink-0">Web:</span>
@@ -248,20 +389,36 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
             )}
           </div>
 
-          {/* App Metadata */}
+          {/* App Name and Category */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <label className="text-xs font-semibold text-slate-700 block mb-1">
                 App Name <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Apex Health Companion"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Matchmoji"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                />
+                {packageName && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const derived = formatPackageToName(packageName);
+                      setName(derived);
+                      setIcon(generateAdaptiveSvgIcon(derived, 0));
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                    title="Reset title from package name"
+                  >
+                    Reset from Package
+                  </button>
+                )}
+              </div>
             </div>
 
             <div>
@@ -272,14 +429,119 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               >
                 <option value="Productivity">Productivity</option>
+                <option value="Games">Games</option>
+                <option value="Tools & Utilities">Tools & Utilities</option>
                 <option value="Health & Fitness">Health & Fitness</option>
                 <option value="Finance">Finance</option>
-                <option value="Tools & Utilities">Tools & Utilities</option>
-                <option value="Games">Games</option>
                 <option value="Lifestyle">Lifestyle</option>
                 <option value="Social">Social</option>
                 <option value="Education">Education</option>
               </select>
+            </div>
+          </div>
+
+          {/* Dedicated App Icon Upload & Selection Card */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-emerald-600" />
+                <span>App Icon (Upload Custom File or Generate)</span>
+              </label>
+              {isUploadingIcon && (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Uploading icon to Supabase...
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* Squircle Preview */}
+              <div className="relative group shrink-0">
+                <div className="w-20 h-20 rounded-2xl bg-white border-2 border-slate-200 p-1 shadow-sm overflow-hidden flex items-center justify-center">
+                  <img 
+                    src={icon} 
+                    alt="App Icon Preview" 
+                    className="w-full h-full object-cover rounded-xl" 
+                    onError={() => setIcon(generateAdaptiveSvgIcon(name || 'App', 0))}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 text-center block mt-1 font-medium">Preview</span>
+              </div>
+
+              {/* Action Buttons: File Upload, URL Input, Adaptive Colors */}
+              <div className="flex-1 space-y-2.5 w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload App Icon</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      onChange={handleIconFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(!showUrlInput)}
+                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{showUrlInput ? 'Hide URL' : 'Paste Image URL'}</span>
+                  </button>
+                </div>
+
+                {/* Optional Custom Image URL input */}
+                {showUrlInput && (
+                  <div className="flex items-center gap-2 animate-fadeIn">
+                    <input
+                      type="url"
+                      value={customUrlInput}
+                      onChange={(e) => setCustomUrlInput(e.target.value)}
+                      placeholder="https://example.com/my-icon.png"
+                      className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCustomUrl}
+                      className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+
+                {/* Adaptive Theme Color Swatches if no custom upload yet */}
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[10px] text-slate-500 font-semibold">Or generate adaptive initial:</span>
+                  <div className="flex items-center gap-1.5">
+                    {[0, 1, 2, 3, 4].map((colorIdx) => (
+                      <button
+                        key={colorIdx}
+                        type="button"
+                        onClick={() => setIcon(generateAdaptiveSvgIcon(name || 'App', colorIdx))}
+                        className="w-5 h-5 rounded-full overflow-hidden border border-slate-300 hover:scale-110 transition cursor-pointer"
+                        title={`Generate theme style ${colorIdx + 1}`}
+                      >
+                        <img 
+                          src={generateAdaptiveSvgIcon(name || 'App', colorIdx)} 
+                          alt="" 
+                          className="w-full h-full object-cover" 
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {iconUploadError && (
+                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{iconUploadError}</span>
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -332,7 +594,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 <option value="tier_3_core">Tier 3: Core QA & Internal VIPs Only</option>
               </select>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Restrict to verified testers for higher reliability and NDA builds.
+                Google Play requires 20 opted-in testers for 14 continuous days.
               </span>
             </div>
 
@@ -349,7 +611,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Google Play requires 20 opted-in testers for 14 continuous days.
+                Standard: 20 testers for 14 continuous days.
               </span>
             </div>
           </div>
@@ -357,21 +619,20 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
           {/* Descriptions */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Short Summary / Pitch <span className="text-rose-500">*</span>
+              Short Summary / Pitch
             </label>
             <input
               type="text"
               value={shortDescription}
               onChange={(e) => setShortDescription(e.target.value)}
-              placeholder="One line explaining what your app does and who it's for..."
+              placeholder="e.g. Fast emoji-matching memory puzzle with Google Play Games leaderboards."
               className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-              required
             />
           </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Full Testing Instructions & Details <span className="text-rose-500">*</span>
+              Testing Instructions & Details
             </label>
             <textarea
               value={fullDescription}
@@ -379,14 +640,13 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
               rows={3}
               placeholder="Detail testing goals, known caveats, sandbox credentials, or what testers should pay attention to..."
               className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-              required
             />
           </div>
 
           {/* Testing Focus Points */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Testing Focus Areas (What to test)
+              Testing Focus Areas (What testers should verify)
             </label>
             <div className="flex gap-2 mb-2">
               <input
@@ -394,13 +654,13 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 value={newFocus}
                 onChange={(e) => setNewFocus(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddFocus(); } }}
-                placeholder="e.g. Test Biometric Prompt on Samsung One UI..."
+                placeholder="e.g. Test on 120Hz displays and Android 14 back gesture..."
                 className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               />
               <button
                 type="button"
                 onClick={handleAddFocus}
-                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold"
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Add
               </button>
@@ -413,30 +673,11 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleRemoveFocus(idx)}
-                    className="text-slate-400 hover:text-rose-600 p-1"
+                    className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Icon Presets */}
-          <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">App Icon</label>
-            <div className="flex items-center gap-3">
-              {DEFAULT_ICONS.map((imgUrl, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setIcon(imgUrl)}
-                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition ${
-                    icon === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/30' : 'border-slate-200 opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <img src={imgUrl} alt={`Preset ${i}`} className="w-full h-full object-cover" />
-                </button>
               ))}
             </div>
           </div>
@@ -446,7 +687,7 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 font-medium"
+              className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
             >
               Cancel
             </button>

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { GoogleAuthModal } from './GoogleAuthModal';
+import { EditAppModal } from './EditAppModal';
 
 interface AppDetailPageProps {
   app: AppListing;
@@ -42,7 +43,7 @@ interface AppDetailPageProps {
 }
 
 export const AppDetailPage: React.FC<AppDetailPageProps> = ({
-  app,
+  app: initialApp,
   onBack,
   onOpenReportBug,
   onOpenFeedback,
@@ -50,6 +51,7 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
 }) => {
   const { 
     currentUser, 
+    apps,
     enrollments, 
     enrollInApp, 
     unenrollFromApp, 
@@ -61,6 +63,10 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
     updateAppScreenshots,
     uploadFileToStorage
   } = useApp();
+
+  const app = apps.find(a => a.id === initialApp.id) || initialApp;
+  const isOwnerOrDev = currentUser?.role === 'developer' || currentUser?.id === app.developerId || !currentUser;
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'feedback' | 'bugs' | 'discussion'>('overview');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -236,14 +242,27 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
           <span>Back to Catalog</span>
         </button>
 
-        <button
-          type="button"
-          onClick={handleCopyShareLink}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition cursor-pointer"
-        >
-          {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
-          <span>{copiedLink ? 'Page Link Copied!' : 'Share App Page'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {isOwnerOrDev && (
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 text-xs font-bold shadow-2xs transition cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit App</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleCopyShareLink}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition cursor-pointer"
+          >
+            {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
+            <span>{copiedLink ? 'Page Link Copied!' : 'Share App Page'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Hero Mini-Site Banner */}
@@ -288,9 +307,21 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <h1 className="font-display font-black text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight">
-                  {app.name}
-                </h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="font-display font-black text-2xl sm:text-3xl lg:text-4xl text-slate-900 tracking-tight">
+                    {app.name}
+                  </h1>
+                  {isOwnerOrDev && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      title="Edit app details or fix misspellings"
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition cursor-pointer"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span>Published by</span>
@@ -1074,6 +1105,13 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
       <GoogleAuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
+      />
+
+      {/* Edit App Modal */}
+      <EditAppModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        app={app}
       />
     </div>
   );

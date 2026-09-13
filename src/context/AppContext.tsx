@@ -49,6 +49,7 @@ interface AppContextType {
   updateUserRole: (role: UserRole) => void;
   updateTesterTier: (tier: TesterTier) => void;
   publishApp: (appData: Omit<AppListing, 'id' | 'developerId' | 'developerName' | 'developerAvatar' | 'currentTesters' | 'createdAt' | 'averageRating' | 'ratingsCount' | 'status'>) => Promise<AppListing>;
+  updateApp: (appId: string, updatedData: Partial<AppListing>) => Promise<AppListing | null>;
   updateAppScreenshots: (appId: string, screenshots: string[]) => Promise<void>;
   enrollInApp: (appId: string, deviceModel: string, osVersion: string) => Promise<boolean>;
   unenrollFromApp: (appId: string) => Promise<void>;
@@ -645,6 +646,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newApp;
   };
 
+  const updateApp = async (appId: string, updatedData: Partial<AppListing>): Promise<AppListing | null> => {
+    let updatedApp: AppListing | null = null;
+    
+    setApps(prev => prev.map(a => {
+      if (a.id === appId) {
+        updatedApp = { ...a, ...updatedData };
+        return updatedApp;
+      }
+      return a;
+    }));
+
+    const payload: Record<string, any> = {};
+    if (updatedData.name !== undefined) payload.name = updatedData.name;
+    if (updatedData.packageName !== undefined) payload.package_name = updatedData.packageName;
+    if (updatedData.versionName !== undefined) payload.version_name = updatedData.versionName;
+    if (updatedData.versionCode !== undefined) payload.version_code = updatedData.versionCode;
+    if (updatedData.icon !== undefined) payload.icon = updatedData.icon;
+    if (updatedData.category !== undefined) payload.category = updatedData.category;
+    if (updatedData.shortDescription !== undefined) payload.short_description = updatedData.shortDescription;
+    if (updatedData.fullDescription !== undefined) payload.full_description = updatedData.fullDescription;
+    if (updatedData.testingTrackUrl !== undefined) payload.testing_track_url = updatedData.testingTrackUrl;
+    if (updatedData.webOptInUrl !== undefined) payload.web_opt_in_url = updatedData.webOptInUrl;
+    if (updatedData.androidOptInUrl !== undefined) payload.android_opt_in_url = updatedData.androidOptInUrl;
+    if (updatedData.googleGroupUrl !== undefined) payload.google_group_url = updatedData.googleGroupUrl;
+    if (updatedData.requiredTier !== undefined) payload.required_tier = updatedData.requiredTier;
+    if (updatedData.targetTesters !== undefined) payload.target_testers = updatedData.targetTesters;
+    if (updatedData.testDurationDays !== undefined) payload.test_duration_days = updatedData.testDurationDays;
+    if (updatedData.status !== undefined) payload.status = updatedData.status;
+    if (updatedData.testingFocus !== undefined) payload.testing_focus = updatedData.testingFocus;
+    if (updatedData.minAndroidVersion !== undefined) payload.min_android_version = updatedData.minAndroidVersion;
+    if (updatedData.screenshots !== undefined) payload.screenshots = updatedData.screenshots;
+
+    if (Object.keys(payload).length > 0) {
+      try {
+        await supabase.from('apps').update(payload).eq('id', appId);
+      } catch (e) {
+        console.warn('Supabase app update warning:', e);
+      }
+    }
+
+    return updatedApp;
+  };
+
   const updateAppScreenshots = async (appId: string, screenshots: string[]): Promise<void> => {
     setApps(prev => prev.map(a => a.id === appId ? { ...a, screenshots } : a));
     try {
@@ -1078,6 +1122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateUserRole,
       updateTesterTier,
       publishApp,
+      updateApp,
       updateAppScreenshots,
       enrollInApp,
       unenrollFromApp,

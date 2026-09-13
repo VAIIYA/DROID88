@@ -12,7 +12,8 @@ import {
   ShieldCheck, 
   Sparkles, 
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 

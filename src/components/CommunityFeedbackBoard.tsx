@@ -280,7 +280,7 @@ export const CommunityFeedbackBoard: React.FC = () => {
       {/* Feature Request & Comments Thread Feed */}
       <div className="space-y-6">
         {filteredFeedbacks.map((item) => {
-          const isLiked = item.likedBy.includes(currentUser.id);
+          const isLiked = currentUser ? item.likedBy.includes(currentUser.id) : false;
           const statusBadge = getStatusBadge(item.status);
           const itemComments = comments.filter(c => c.feedbackId === item.id);
           const isExpanded = expandedFeedbackId === item.id;
@@ -320,7 +320,7 @@ export const CommunityFeedbackBoard: React.FC = () => {
                       {statusBadge.label}
                     </span>
 
-                    {currentUser.role === 'developer' && (
+                    {currentUser?.role === 'developer' && (
                       <select
                         value={item.status}
                         onChange={(e) => updateFeatureStatus(item.id, e.target.value as any)}
@@ -402,7 +402,7 @@ export const CommunityFeedbackBoard: React.FC = () => {
                       </p>
                     ) : (
                       itemComments.map((comm) => {
-                        const isCommentLiked = comm.likedBy.includes(currentUser.id);
+                        const isCommentLiked = currentUser ? comm.likedBy.includes(currentUser.id) : false;
                         return (
                           <div key={comm.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-1.5 text-xs shadow-2xs">
                             <div className="flex items-center justify-between">
@@ -448,8 +448,8 @@ export const CommunityFeedbackBoard: React.FC = () => {
                   {/* Add Comment Input */}
                   <div className="flex gap-2 pt-2">
                     <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
+                      src={currentUser?.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=visitor'}
+                      alt={currentUser?.name || 'Visitor'}
                       className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
                     />
                     <div className="flex-1 flex gap-2">

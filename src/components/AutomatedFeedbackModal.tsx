@@ -39,7 +39,7 @@ export const AutomatedFeedbackModal: React.FC<AutomatedFeedbackModalProps> = ({
   const [favoriteFeatures, setFavoriteFeatures] = useState('');
   const [confusingAreas, setConfusingAreas] = useState('');
   const [netPromoterScore, setNetPromoterScore] = useState(9);
-  const [deviceModel, setDeviceModel] = useState(currentUser.deviceInfo?.model || 'Google Pixel 8 Pro');
+  const [deviceModel, setDeviceModel] = useState(currentUser?.deviceInfo?.model || 'Google Pixel 8 Pro');
 
   if (!isOpen) return null;
 

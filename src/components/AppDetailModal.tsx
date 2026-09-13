@@ -46,18 +46,21 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
     performDailyCheckin, 
     bugReports, 
     automatedFeedbacks,
-    featureFeedbacks
+    featureFeedbacks,
+    signInWithSupabaseGoogle
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'feedback' | 'bugs' | 'discussion'>('overview');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(currentUser.deviceInfo?.model || 'Google Pixel 8 Pro');
-  const [selectedOs, setSelectedOs] = useState(currentUser.deviceInfo?.osVersion || 'Android 14 (API 34)');
+  const [selectedDevice, setSelectedDevice] = useState(currentUser?.deviceInfo?.model || 'Google Pixel 8 Pro');
+  const [selectedOs, setSelectedOs] = useState(currentUser?.deviceInfo?.osVersion || 'Android 14 (API 34)');
   const [justEnrolled, setJustEnrolled] = useState(false);
 
   if (!app) return null;
 
-  const currentEnrollment = enrollments.find(e => e.appId === app.id && e.testerId === currentUser.id);
+  const currentEnrollment = currentUser 
+    ? enrollments.find(e => e.appId === app.id && e.testerId === currentUser.id)
+    : undefined;
   const isEnrolled = !!currentEnrollment;
 
   const appBugs = bugReports.filter(b => b.appId === app.id);
@@ -65,6 +68,7 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
   const appFeatures = featureFeedbacks.filter(f => f.appId === app.id);
 
   const canAccessTier = (): boolean => {
+    if (!currentUser) return true;
     if (currentUser.role === 'developer') return true;
     if (app.requiredTier === 'tier_1_standard') return true;
     if (app.requiredTier === 'tier_2_verified') {
@@ -85,6 +89,10 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
   };
 
   const handleEnroll = () => {
+    if (!currentUser) {
+      signInWithSupabaseGoogle();
+      return;
+    }
     enrollInApp(app.id, selectedDevice, selectedOs);
     setJustEnrolled(true);
     confetti({

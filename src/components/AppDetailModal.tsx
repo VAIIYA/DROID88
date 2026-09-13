@@ -47,7 +47,8 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
     bugReports, 
     automatedFeedbacks,
     featureFeedbacks,
-    signInWithSupabaseGoogle
+    signInWithSupabaseGoogle,
+    signInWithSupabaseGithub
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'feedback' | 'bugs' | 'discussion'>('overview');
@@ -90,7 +91,7 @@ export const AppDetailModal: React.FC<AppDetailModalProps> = ({
 
   const handleEnroll = () => {
     if (!currentUser) {
-      signInWithSupabaseGoogle();
+      signInWithSupabaseGithub();
       return;
     }
     enrollInApp(app.id, selectedDevice, selectedOs);

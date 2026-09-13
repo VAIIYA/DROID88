@@ -351,24 +351,22 @@ export const AppDetailPage: React.FC<AppDetailPageProps> = ({
               </div>
 
               {/* Google Play Opt-in Requirements Helper Notice */}
-              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 max-w-2xl mt-2">
+              <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 max-w-2xl mt-2 shadow-2xs">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <span className="font-semibold text-amber-950 block">Why does Google Play show &ldquo;App not available&rdquo; or &ldquo;URL not found&rdquo;?</span>
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-amber-950 block">Google Play Closed Testing Access Requirements</span>
                   <p className="text-amber-800 leading-relaxed">
-                    Google Play Closed Testing tracks are strictly private. Before you can open the opt-in link, your Google Account must be a member of the developer&apos;s <strong>Google Group</strong> (or added to their Console tester email list), and Google must finish reviewing their closed testing release. Once joined with the same Google Account you use on your Android phone, the link unlocks immediately.
+                    Google Play requires your Google Account to be in the <strong>DROID88 Google Group</strong> (<code className="font-mono text-[10px] bg-amber-100 px-1 py-0.5 rounded text-amber-900">droid88@googlegroups.com</code>). If you see &ldquo;App not available&rdquo; or &ldquo;URL not found&rdquo;, join the group once using the Google Account on your phone. All apps on DROID88 unlock automatically!
                   </p>
-                  {app.googleGroupUrl && (
-                    <a 
-                      href={app.googleGroupUrl} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="inline-flex items-center gap-1 font-bold text-emerald-800 hover:text-emerald-950 underline pt-0.5"
-                    >
-                      <span>Join {app.name}&apos;s Google Group Now</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <a 
+                    href="https://groups.google.com/g/droid88" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-1 font-bold text-emerald-800 hover:text-emerald-950 underline pt-0.5"
+                  >
+                    <span>Join the Universal DROID88 Google Group (1-Click)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
             </div>

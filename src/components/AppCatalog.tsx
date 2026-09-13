@@ -155,6 +155,36 @@ export const AppCatalog: React.FC<AppCatalogProps> = ({
         </div>
       </div>
 
+      {/* Persistent DROID88 Universal Google Group Banner */}
+      <div className="rounded-2xl bg-linear-to-r from-emerald-950 via-slate-900 to-emerald-900 p-5 text-white border border-emerald-500/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+            <Users className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm text-white">Join the Universal DROID88 Google Group (1-Time Setup)</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 font-mono">
+                droid88@googlegroups.com
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+              Join this group once with the Google Account on your Android phone. All indie apps on Droid88 use this single group, instantly granting you Play Store access to every closed testing build with 1 click!
+            </p>
+          </div>
+        </div>
+
+        <a
+          href="https://groups.google.com/g/droid88"
+          target="_blank"
+          rel="noreferrer"
+          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2 shrink-0 self-stretch md:self-auto justify-center"
+        >
+          <span>Join DROID88 Group</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
+
       {/* Filter and Search Bar (WooCommerce Shop Bar) */}
       <div id="catalog-list" className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">

@@ -14,7 +14,10 @@ import {
   CheckCircle,
   Loader2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  Check,
+  Users
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -90,7 +93,8 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
   const [testingTrackUrl, setTestingTrackUrl] = useState('');
   const [webOptInUrl, setWebOptInUrl] = useState('');
   const [androidOptInUrl, setAndroidOptInUrl] = useState('');
-  const [googleGroupUrl, setGoogleGroupUrl] = useState('');
+  const [googleGroupUrl, setGoogleGroupUrl] = useState('https://groups.google.com/g/droid88');
+  const [copiedGroupEmail, setCopiedGroupEmail] = useState(false);
   const [requiredTier, setRequiredTier] = useState<TesterTier>('tier_1_standard');
   const [targetTesters, setTargetTesters] = useState(20);
   const [testDurationDays, setTestDurationDays] = useState(14);
@@ -103,6 +107,14 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
   const [autoFillBadge, setAutoFillBadge] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState('');
+
+  const handleCopyGroupEmail = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText('droid88@googlegroups.com');
+      setCopiedGroupEmail(true);
+      setTimeout(() => setCopiedGroupEmail(false), 2000);
+    }
+  };
 
   // Auto-detect package name, auto-fill app name & icon, and dual URLs
   const handleUrlOrPackageChange = async (val: string) => {
@@ -357,20 +369,42 @@ export const PublishAppModal: React.FC<PublishAppModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Google Group URL <span className="text-emerald-700 font-bold">(Recommended for 1-Click Tester Access)</span>
-                </label>
-                <input
-                  type="url"
-                  value={googleGroupUrl}
-                  onChange={(e) => setGoogleGroupUrl(e.target.value)}
-                  placeholder="https://groups.google.com/g/matchmoji"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                />
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  Testers will auto-join this Google Group to unlock your Google Play closed testing track without manual email invites!
-                </span>
+              <div className="flex flex-col justify-between p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-emerald-700" />
+                      Universal DROID88 Tester Group
+                    </span>
+                    <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+                      Auto-Configured
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 mt-1 leading-relaxed">
+                    Add this group email in your <strong>Google Play Console &gt; Closed Testing &gt; Testers</strong> to automatically grant access to all Droid88 testers:
+                  </p>
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-emerald-200 font-mono text-xs">
+                  <span className="text-emerald-900 font-semibold select-all">droid88@googlegroups.com</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyGroupEmail}
+                    className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-900 font-sans font-bold cursor-pointer"
+                  >
+                    {copiedGroupEmail ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Email</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

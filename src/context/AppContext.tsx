@@ -560,6 +560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newApp: AppListing = {
       ...appData,
+      googleGroupUrl: appData.googleGroupUrl || 'https://groups.google.com/g/droid88',
       id: `app_${Date.now()}`,
       developerId: authorId,
       developerName: authorName,
